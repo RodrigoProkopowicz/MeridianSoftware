@@ -1,0 +1,195 @@
+/* ============================================
+   Meridian Software — Demo Request Section
+   ============================================ */
+
+.demo-section {
+  background: var(--color-surface);
+  position: relative;
+}
+
+.demo-section::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(74,144,217,0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.demo-section__content {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.demo-section__auth-prompt {
+  text-align: center;
+  padding: var(--space-3xl);
+}
+
+.demo-section__auth-prompt-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-lg);
+  opacity: 0.6;
+}
+
+.demo-section__auth-prompt-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-md);
+}
+
+.demo-section__auth-prompt-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xl);
+  line-height: var(--line-height-relaxed);
+}
+
+.demo-section__form {
+  padding: var(--space-2xl);
+}
+
+.demo-section__form-submit {
+  width: 100%;
+  margin-top: var(--space-md);
+}
+
+.demo-section__form-success {
+  display: none;
+  text-align: center;
+  padding: var(--space-3xl);
+}
+
+.demo-section__form-success.visible {
+  display: block;
+}
+
+.demo-section__form-success-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-lg);
+  animation: scaleIn 0.5s ease-out;
+}
+
+.demo-section__form-success-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+}
+
+.demo-section__form-success-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* User Profile Badge */
+.user-profile-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  position: relative;
+}
+
+.user-profile-badge__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  border: 2px solid rgba(232,220,200,0.15);
+  object-fit: cover;
+}
+
+.user-profile-badge__avatar--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.85rem;
+}
+
+.user-profile-badge__skeleton {
+  width: 80px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg,
+    rgba(232,220,200,0.04) 0%,
+    rgba(232,220,200,0.10) 50%,
+    rgba(232,220,200,0.04) 100%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.user-profile-badge__name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.user-profile-badge__dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-sm));
+  right: 0;
+  min-width: 180px;
+  padding: var(--space-sm);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-surface-glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-5px);
+  transition: all var(--transition-fast);
+}
+
+.user-profile-badge__dropdown.open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.user-profile-badge__dropdown-header {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-surface-glass-border);
+  margin-bottom: var(--space-xs);
+}
+
+.user-profile-badge__dropdown-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.user-profile-badge__dropdown-email {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.user-profile-badge__dropdown-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+  background: none;
+}
+
+.user-profile-badge__dropdown-item:hover {
+  background: rgba(74,144,217,0.1);
+  color: var(--color-text-primary);
+}

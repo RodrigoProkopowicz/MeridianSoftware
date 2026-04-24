@@ -1,0 +1,139 @@
+/**
+ * DomHelper.js
+ * 
+ * Utility functions for DOM manipulation, element creation,
+ * and common DOM operations used throughout the application.
+ */
+
+/**
+ * Selects a single DOM element.
+ * @param {string} selector - CSS selector
+ * @param {Element} [parent=document] - Parent element to search within
+ * @returns {Element|null}
+ */
+export function querySelector(selector, parent = document) {
+  return parent.querySelector(selector);
+}
+
+/**
+ * Selects all matching DOM elements.
+ * @param {string} selector - CSS selector
+ * @param {Element} [parent=document] - Parent element to search within
+ * @returns {NodeList}
+ */
+export function querySelectorAll(selector, parent = document) {
+  return parent.querySelectorAll(selector);
+}
+
+/**
+ * Creates an HTML element with optional attributes and children.
+ * @param {string} tag - HTML tag name
+ * @param {Object} [attributes={}] - Key-value pairs for attributes
+ * @param {Array<Element|string>} [children=[]] - Child elements or text
+ * @returns {Element}
+ */
+export function createElement(tag, attributes = {}, children = []) {
+  const element = document.createElement(tag);
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    if (key === 'className') {
+      element.className = value;
+    } else if (key === 'innerHTML') {
+      element.innerHTML = value;
+    } else if (key === 'textContent') {
+      element.textContent = value;
+    } else if (key.startsWith('on')) {
+      const event = key.slice(2).toLowerCase();
+      element.addEventListener(event, value);
+    } else if (key === 'dataset') {
+      Object.entries(value).forEach(([dataKey, dataVal]) => {
+        element.dataset[dataKey] = dataVal;
+      });
+    } else {
+      element.setAttribute(key, value);
+    }
+  });
+
+  children.forEach(child => {
+    if (typeof child === 'string') {
+      element.appendChild(document.createTextNode(child));
+    } else if (child instanceof Element) {
+      element.appendChild(child);
+    }
+  });
+
+  return element;
+}
+
+/**
+ * Sets innerHTML safely on a container element.
+ * @param {Element} container - Target container
+ * @param {string} html - HTML string to inject
+ */
+export function setHTML(container, html) {
+  container.innerHTML = html;
+}
+
+/**
+ * Escapes a string for safe insertion into HTML.
+ * Use whenever user-provided strings are interpolated into template literals.
+ * @param {string} value
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+  if (value == null) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Smooth-scrolls to a target element.
+ * @param {string} selector - CSS selector of target
+ * @param {number} [offset=0] - Pixel offset from top
+ */
+export function smoothScrollTo(selector, offset = 0) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+
+  const top = target.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
+/**
+ * Shows a toast notification.
+ * @param {string} message - Toast message
+ * @param {'success'|'error'} [type='success'] - Toast type
+ * @param {number} [duration=3500] - Duration in ms
+ */
+export function showToast(message, type = 'success', duration = 3500) {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = createElement('div', {
+      className: 'toast-container',
+      'aria-live': 'polite',
+      'aria-atomic': 'true',
+      role: 'status',
+    });
+    document.body.appendChild(container);
+  }
+
+  // Errors are assertive so they interrupt the screen reader immediately.
+  const toast = createElement('div', {
+    className: `toast ${type}`,
+    role: type === 'error' ? 'alert' : 'status',
+    textContent: message,
+  });
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}

@@ -1,0 +1,83 @@
+rules_version = '2';
+
+// Meridian Software — Firestore Security Rules
+//
+// Collections:
+//   users/{uid}               — user profile owned by that uid
+//   demoRequests/{id}         — created by authenticated user; immutable after create
+//   contactSubmissions/{id}   — created by anyone (anonymous contact form); read by admin only
+//
+// Deploy with:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers ----
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function payloadSizeOK() {
+      // Cap request size at ~50KB to prevent abuse
+      return request.resource.size < 50000;
+    }
+
+    function hasOnlyFields(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    function isNonEmptyString(field, maxLen) {
+      return field is string && field.size() > 0 && field.size() <= maxLen;
+    }
+
+    // ---- users/{uid} ----
+    // Profile is created and maintained by AuthenticationService.createOrUpdateUserProfile
+    match /users/{uid} {
+      allow read:   if isOwner(uid);
+      allow create: if isOwner(uid)
+                       && hasOnlyFields(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
+                       && payloadSizeOK();
+      allow update: if isOwner(uid)
+                       && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
+                       && payloadSizeOK();
+      allow delete: if false;
+    }
+
+    // ---- demoRequests/{id} ----
+    // Any signed-in user can create a request for themselves; not readable/editable from the client.
+    // Admin access is handled server-side (Firebase Console or Admin SDK).
+    match /demoRequests/{id} {
+      allow read:   if false;
+      allow create: if isSignedIn()
+                       && request.resource.data.userId == request.auth.uid
+                       && hasOnlyFields(['userId','solutionType','companyName','message','preferredDate','status','recaptchaToken','createdAt'])
+                       && isNonEmptyString(request.resource.data.solutionType, 100)
+                       && isNonEmptyString(request.resource.data.companyName, 200)
+                       && request.resource.data.status == 'pending'
+                       && payloadSizeOK();
+      allow update, delete: if false;
+    }
+
+    // ---- contactSubmissions/{id} ----
+    // Open to anonymous creation (contact form); not readable from client.
+    match /contactSubmissions/{id} {
+      allow read:   if false;
+      allow create: if hasOnlyFields(['name','email','company','message','status','recaptchaToken','createdAt'])
+                       && isNonEmptyString(request.resource.data.name, 200)
+                       && isNonEmptyString(request.resource.data.email, 200)
+                       && isNonEmptyString(request.resource.data.message, 5000)
+                       && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+                       && request.resource.data.status == 'new'
+                       && payloadSizeOK();
+      allow update, delete: if false;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

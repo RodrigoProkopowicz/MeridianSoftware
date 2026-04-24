@@ -1,0 +1,140 @@
+/* ============================================
+   Meridian Software — Contact Section
+   ============================================ */
+
+.contact-section {
+  background: var(--color-primary);
+  position: relative;
+}
+
+.contact-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(232, 220, 200, 0.1), transparent);
+}
+
+.contact-section__layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: var(--space-4xl);
+  align-items: start;
+}
+
+.contact-section__info {
+  padding-top: var(--space-lg);
+}
+
+.contact-section__info-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-lg);
+  line-height: var(--line-height-snug);
+}
+
+.contact-section__info-text {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin-bottom: var(--space-2xl);
+}
+
+.contact-section__info-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.contact-section__info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.contact-section__info-item-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(74, 144, 217, 0.1);
+  border: 1px solid rgba(74, 144, 217, 0.15);
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.contact-section__info-item-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.contact-section__info-item-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
+  margin-bottom: 2px;
+}
+
+.contact-section__info-item-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* ---- Form ---- */
+.contact-section__form {
+  padding: var(--space-2xl);
+}
+
+.contact-section__form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+.contact-section__form-submit {
+  width: 100%;
+  margin-top: var(--space-md);
+}
+
+.contact-section__form-success {
+  display: none;
+  text-align: center;
+  padding: var(--space-3xl);
+}
+
+.contact-section__form-success.visible {
+  display: block;
+}
+
+.contact-section__form-success-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-lg);
+  animation: scaleIn 0.5s ease-out;
+}
+
+.contact-section__form-success-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+}
+
+.contact-section__form-success-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .contact-section__layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-2xl);
+  }
+
+  .contact-section__form-row {
+    grid-template-columns: 1fr;
+  }
+}

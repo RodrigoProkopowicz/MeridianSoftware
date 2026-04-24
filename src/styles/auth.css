@@ -1,0 +1,187 @@
+/* ============================================
+   Meridian Software — Auth Modal
+   ============================================ */
+
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-slow);
+}
+
+.auth-modal.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.auth-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--color-overlay);
+  backdrop-filter: blur(var(--blur-md));
+}
+
+.auth-modal__panel {
+  position: relative;
+  z-index: var(--z-modal);
+  width: 90%;
+  max-width: 420px;
+  padding: var(--space-3xl);
+  background: var(--gradient-card);
+  border: 1px solid var(--color-surface-glass-border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(var(--blur-lg));
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--transition-slow);
+  box-shadow: var(--shadow-xl);
+}
+
+.auth-modal.open .auth-modal__panel {
+  transform: scale(1) translateY(0);
+}
+
+.auth-modal__close {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.05);
+  color: var(--color-text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.auth-modal__close:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--color-text-primary);
+}
+
+.auth-modal__logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  margin: 0 auto var(--space-xl);
+  opacity: 0.95;
+}
+
+.auth-modal__title {
+  text-align: center;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+}
+
+.auth-modal__subtitle {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2xl);
+}
+
+.auth-modal__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: 0.9rem var(--space-xl);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+}
+
+.auth-button__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.auth-button--google {
+  background: #fff;
+  color: #3c4043;
+}
+
+.auth-button--google:hover {
+  background: #f1f3f4;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.auth-button--apple {
+  background: #000;
+  color: #fff;
+}
+
+.auth-button--apple:hover {
+  background: #1a1a1a;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.auth-button__label {
+  display: inline-block;
+}
+
+.auth-button.loading {
+  pointer-events: none;
+  position: relative;
+  color: transparent;
+}
+
+.auth-button.loading .auth-button__icon,
+.auth-button.loading .auth-button__label {
+  opacity: 0.2;
+}
+
+.auth-button.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.auth-button--apple.loading::after {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+}
+
+.auth-modal__terms {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-xl);
+  line-height: var(--line-height-relaxed);
+}
+
+.auth-modal__terms a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
