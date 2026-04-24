@@ -9,6 +9,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { initHeroAnimations } from './HeroAnimation.js';
 import { initRevealAnimations } from './RevealAnimation.js';
+import { initDeviceSceneAnimation } from './DeviceSceneAnimation.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -39,6 +40,7 @@ export function initializeAllAnimations() {
     initRevealAnimations();
     initNavbarScrollEffect();
     initParallaxEffects();
+    initDeviceSceneAnimation();
   });
 }
 
@@ -72,10 +74,15 @@ function initNavbarScrollEffect() {
 
 /**
  * Parallax movement for hero background elements.
+ * Skipped on mobile — the subtle motion isn't perceptible on small screens
+ * and the scrub-tied scroll handler burns battery without benefit.
  */
 function initParallaxEffects() {
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  if (isMobile) return;
+
   const orbs = document.querySelectorAll('.hero-section__orb');
-  
+
   orbs.forEach((orb, index) => {
     gsap.to(orb, {
       y: () => (index + 1) * -80,

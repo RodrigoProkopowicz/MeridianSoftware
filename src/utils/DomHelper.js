@@ -75,6 +75,38 @@ export function setHTML(container, html) {
 }
 
 /**
+ * Body-scroll lock with refcount + scroll-position preservation.
+ *
+ * Plain `overflow: hidden` on body is unreliable on iOS Safari — touch
+ * scroll leaks through to the html element. Using `position: fixed`
+ * removes the body from scroll flow entirely, but then you lose the user's
+ * scroll position, so we save and restore it.
+ *
+ * Refcount lets multiple overlays (auth modal + mobile menu + future
+ * overlays) nest or overlap without one undoing the other.
+ */
+let __savedScrollY = 0;
+let __lockCount = 0;
+
+export function lockBodyScroll() {
+  if (__lockCount === 0) {
+    __savedScrollY = window.scrollY;
+    document.body.style.top = `-${__savedScrollY}px`;
+    document.body.classList.add('scroll-locked');
+  }
+  __lockCount += 1;
+}
+
+export function unlockBodyScroll() {
+  __lockCount = Math.max(0, __lockCount - 1);
+  if (__lockCount === 0) {
+    document.body.classList.remove('scroll-locked');
+    document.body.style.top = '';
+    window.scrollTo(0, __savedScrollY);
+  }
+}
+
+/**
  * Escapes a string for safe insertion into HTML.
  * Use whenever user-provided strings are interpolated into template literals.
  * @param {string} value

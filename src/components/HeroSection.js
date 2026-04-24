@@ -7,6 +7,7 @@
 import { smoothScrollTo } from '../utils/DomHelper.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
+import { renderDeviceScene } from './DeviceScene.js';
 
 /**
  * Renders the hero section HTML.
@@ -22,15 +23,10 @@ export function renderHeroSection() {
         <div class="hero-section__grid"></div>
       </div>
 
-      <div class="hero-section__shapes">
-        <div class="hero-section__shape hero-section__shape--1"></div>
-        <div class="hero-section__shape hero-section__shape--2"></div>
-        <div class="hero-section__shape hero-section__shape--3"></div>
-        <div class="hero-section__shape hero-section__shape--4"></div>
-      </div>
+      ${renderDeviceScene()}
 
       <div class="hero-section__content">
-        <img src="/logo.png" alt="Meridian Software" class="hero-section__logo" />
+        <img src="/logo.png" alt="Meridian Software" class="hero-section__logo" decoding="async" fetchpriority="high" />
         
         <h1 class="hero-section__title">
           <span class="hero-section__title-gradient">Building Digital Excellence</span>
@@ -43,13 +39,13 @@ export function renderHeroSection() {
         </p>
 
         <div class="hero-section__actions">
-          <button class="button-primary" id="hero-explore-button">
+          <button class="button-primary" id="hero-explore-button" data-magnetic>
             Explore Solutions
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M7 17L17 7M17 7H7M17 7V17"/>
             </svg>
           </button>
-          <button class="button-secondary" id="hero-contact-button">
+          <button class="button-secondary" id="hero-contact-button" data-magnetic>
             Get in Touch
           </button>
         </div>

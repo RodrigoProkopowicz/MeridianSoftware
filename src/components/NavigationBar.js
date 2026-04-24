@@ -5,7 +5,7 @@
  * Supports mobile hamburger menu.
  */
 
-import { smoothScrollTo } from '../utils/DomHelper.js';
+import { smoothScrollTo, lockBodyScroll, unlockBodyScroll } from '../utils/DomHelper.js';
 import { renderUserProfileBadge } from './UserProfileBadge.js';
 
 /**
@@ -17,7 +17,7 @@ export function renderNavigationBar() {
     <nav class="navigation-bar" id="navigation-bar">
       <div class="container navigation-bar__inner">
         <a href="#hero" class="navigation-bar__logo" aria-label="Meridian Software Home">
-          <img src="/logo.png" alt="Meridian Software" />
+          <img src="/logo.png" alt="Meridian Software" decoding="async" fetchpriority="high" />
         </a>
 
         <div class="navigation-bar__links hide-mobile">
@@ -29,7 +29,7 @@ export function renderNavigationBar() {
 
         <div class="navigation-bar__actions">
           ${renderUserProfileBadge()}
-          <button class="navigation-bar__hamburger show-mobile" id="hamburger-button" aria-label="Toggle menu">
+          <button class="navigation-bar__hamburger" id="hamburger-button" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
             <span></span>
             <span></span>
             <span></span>
@@ -81,18 +81,23 @@ function toggleMobileMenu() {
   const hamburger = document.getElementById('hamburger-button');
   const mobileMenu = document.getElementById('mobile-menu');
 
-  hamburger.classList.toggle('active');
+  const isOpen = hamburger.classList.toggle('active');
   mobileMenu.classList.toggle('open');
-  document.body.classList.toggle('scroll-locked');
+  hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (isOpen) lockBodyScroll(); else unlockBodyScroll();
 }
 
 function closeMobileMenu() {
   const hamburger = document.getElementById('hamburger-button');
   const mobileMenu = document.getElementById('mobile-menu');
-  
-  if (hamburger) hamburger.classList.remove('active');
+
+  const wasOpen = hamburger && hamburger.classList.contains('active');
+  if (hamburger) {
+    hamburger.classList.remove('active');
+    hamburger.setAttribute('aria-expanded', 'false');
+  }
   if (mobileMenu) mobileMenu.classList.remove('open');
-  document.body.classList.remove('scroll-locked');
+  if (wasOpen) unlockBodyScroll();
 }
 
 function initScrollSpy() {

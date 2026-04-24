@@ -4,7 +4,12 @@
 
 .hero-section {
   position: relative;
+  /* 100vh on mobile Safari includes the browser chrome area, which pushes
+     content below the visible viewport. 100svh (small viewport height) is
+     the smallest possible viewport with chrome visible — most reliable.
+     Fall back to 100vh for browsers that don't support svh. */
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,11 +31,25 @@
   filter: blur(80px);
   opacity: 0.2;
   animation: float 12s ease-in-out infinite;
+  /* Promote to its own layer so blur doesn't repaint neighbours on scroll. */
+  transform: translateZ(0);
+}
+
+/* ---- Mobile perf: lighter blur is visually ~identical at tiny orb sizes
+       and radically cheaper on mobile GPUs. ---- */
+@media (max-width: 768px) {
+  .hero-section__orb {
+    filter: blur(40px);
+    animation-duration: 20s;
+  }
+  .hero-section__orb--tertiary {
+    display: none;
+  }
 }
 
 .hero-section__orb--primary {
-  width: 500px;
-  height: 500px;
+  width: clamp(260px, 40vw, 500px);
+  height: clamp(260px, 40vw, 500px);
   background: var(--color-accent);
   top: -10%;
   right: -5%;
@@ -38,8 +57,8 @@
 }
 
 .hero-section__orb--secondary {
-  width: 350px;
-  height: 350px;
+  width: clamp(200px, 28vw, 350px);
+  height: clamp(200px, 28vw, 350px);
   background: var(--color-secondary);
   bottom: -10%;
   left: -5%;
@@ -48,8 +67,8 @@
 }
 
 .hero-section__orb--tertiary {
-  width: 200px;
-  height: 200px;
+  width: clamp(120px, 16vw, 200px);
+  height: clamp(120px, 16vw, 200px);
   background: var(--color-accent-light);
   top: 40%;
   left: 30%;
@@ -74,6 +93,7 @@
   z-index: var(--z-base);
   text-align: center;
   max-width: 800px;
+  width: 100%;
   padding: 0 var(--container-padding);
 }
 
@@ -116,8 +136,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .hero-section__actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+  .hero-section__actions > * {
+    width: 100%;
+  }
 }
 
 /* ---- Scroll Indicator ---- */

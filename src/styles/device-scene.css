@@ -1,0 +1,77 @@
+/* ============================================
+   Meridian Software — Device Scene (scroll story)
+   ============================================ */
+
+.device-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.device-scene__devices {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1700px, 98vw);
+  height: auto;
+  opacity: 0.85;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.4));
+}
+
+.device-scene__part {
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.device-scene__snippets {
+  position: absolute;
+  inset: 0;
+}
+
+.device-scene__code {
+  position: absolute;
+  font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.02em;
+  color: var(--color-accent-light);
+  background: rgba(15, 25, 35, 0.8);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(74, 144, 217, 0.15);
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  text-shadow: 0 0 8px rgba(74, 144, 217, 0.3);
+}
+
+.device-scene__code:nth-child(3n) { color: var(--color-success); border-color: rgba(74, 222, 128, 0.2); }
+.device-scene__code:nth-child(3n+1) { color: var(--color-secondary); border-color: rgba(232, 220, 200, 0.15); }
+.device-scene__code:nth-child(5n) { color: var(--color-warning); border-color: rgba(251, 191, 36, 0.18); }
+
+@media (max-width: 1024px) {
+  /* On narrower screens there's no room for side devices + centered text. */
+  .device-scene__devices {
+    opacity: 0.35;
+    width: 140vw;
+  }
+}
+
+@media (max-width: 768px) {
+  /* On small screens the scene is hidden entirely — devices have no room
+     alongside centered text and floating code snippets without devices
+     look like orphaned chrome. */
+  .device-scene {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .device-scene__code {
+    opacity: 0.4;
+  }
+}

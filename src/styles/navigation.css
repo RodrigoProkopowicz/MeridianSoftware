@@ -85,36 +85,65 @@
   gap: var(--space-md);
 }
 
-/* ---- Mobile Hamburger ---- */
+/* ---- Mobile Hamburger ----
+   Layout: three 20px-wide bars stacked inside a 44x44 hit area (WCAG 2.5.5).
+   Bars are absolutely positioned around the centre so the "X" transform
+   rotates each one around the same point — no translate/rotate math tricks. */
 .navigation-bar__hamburger {
   display: none;
-  flex-direction: column;
-  gap: 5px;
-  width: 28px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   cursor: pointer;
-  padding: var(--space-xs);
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
   z-index: calc(var(--z-sticky) + 10);
+  transition: background var(--transition-fast);
+}
+
+.navigation-bar__hamburger:hover,
+.navigation-bar__hamburger:focus-visible {
+  background: rgba(232, 220, 200, 0.06);
+}
+
+.navigation-bar__hamburger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .navigation-bar__hamburger span {
-  display: block;
-  width: 100%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
   height: 2px;
+  margin-left: -11px;
   background: var(--color-text-primary);
   border-radius: var(--radius-full);
-  transition: all var(--transition-base);
+  transition:
+    transform var(--transition-base),
+    opacity 150ms ease,
+    top 150ms var(--transition-base);
 }
 
+/* Closed state — three parallel bars */
+.navigation-bar__hamburger span:nth-child(1) { top: calc(50% - 7px); }
+.navigation-bar__hamburger span:nth-child(2) { top: 50%; }
+.navigation-bar__hamburger span:nth-child(3) { top: calc(50% + 7px); }
+
+/* Open state — clean X. All three bars rotate around a shared centre. */
 .navigation-bar__hamburger.active span:nth-child(1) {
-  transform: rotate(45deg) translate(5px, 5px);
+  top: 50%;
+  transform: rotate(45deg);
 }
-
 .navigation-bar__hamburger.active span:nth-child(2) {
   opacity: 0;
+  transform: scaleX(0.2);
 }
-
 .navigation-bar__hamburger.active span:nth-child(3) {
-  transform: rotate(-45deg) translate(5px, -5px);
+  top: 50%;
+  transform: rotate(-45deg);
 }
 
 /* ---- Mobile Menu ---- */
@@ -127,14 +156,29 @@
   bottom: 0;
   background: rgba(15, 25, 35, 0.97);
   backdrop-filter: blur(var(--blur-lg));
+  -webkit-backdrop-filter: blur(var(--blur-lg));
   z-index: var(--z-sticky);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2xl);
+  gap: clamp(var(--space-lg), 5vh, var(--space-2xl));
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-slow);
+  /* No scroll inside the menu — content is sized to always fit. Combined
+     with overscroll-behavior below, this removes the iOS Safari
+     rubber-band bounce that triggers when the user tries to scroll. */
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/* Menu items must opt back in to pointer events since the container
+   uses touch-action: none to block scroll gestures. */
+.navigation-bar__mobile-menu .navigation-bar__link {
+  touch-action: manipulation;
 }
 
 .navigation-bar__mobile-menu.open {
@@ -153,10 +197,22 @@
   }
 
   .navigation-bar__hamburger {
-    display: flex;
+    display: block;
   }
 
   .navigation-bar__actions .user-profile-badge__name {
     display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .navigation-bar__logo img {
+    height: 28px;
+  }
+  .navigation-bar.scrolled .navigation-bar__logo img {
+    height: 24px;
+  }
+  .navigation-bar__actions {
+    gap: var(--space-sm);
   }
 }

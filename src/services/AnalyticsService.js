@@ -6,9 +6,12 @@
  * browsers with IndexedDB disabled) or when event logging fails.
  *
  * Import event names from AnalyticsEvents.js, not as string literals.
+ *
+ * Bundle note: `logEvent` is obtained from the `analyticsReady` promise,
+ * which dynamically imports `firebase/analytics`. Doing it that way keeps
+ * the analytics SDK in its own chunk instead of the main bundle.
  */
 
-import { logEvent } from 'firebase/analytics';
 import { analyticsReady } from '../config/FirebaseConfig.js';
 
 /**
@@ -18,10 +21,10 @@ import { analyticsReady } from '../config/FirebaseConfig.js';
  * @returns {Promise<void>}
  */
 export async function trackEvent(eventName, params = {}) {
-  const analytics = await analyticsReady;
-  if (!analytics) return;
+  const ready = await analyticsReady;
+  if (!ready) return;
   try {
-    logEvent(analytics, eventName, params);
+    ready.logEvent(ready.analytics, eventName, params);
   } catch (err) {
     console.warn('AnalyticsService: logEvent failed —', err.message);
   }

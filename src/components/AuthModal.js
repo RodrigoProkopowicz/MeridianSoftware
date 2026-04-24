@@ -10,7 +10,7 @@ import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
 import { executeRecaptcha } from '../services/RecaptchaService.js';
 import { RecaptchaAction } from '../services/RecaptchaActions.js';
-import { showToast } from '../utils/DomHelper.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from '../utils/DomHelper.js';
 
 const GOOGLE_ICON_SVG = `
   <svg class="auth-button__icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -36,7 +36,7 @@ export function renderAuthModal() {
       <div class="auth-modal__panel">
         <button class="auth-modal__close" id="auth-modal-close" aria-label="Close">✕</button>
 
-        <img src="/logo.png" alt="Meridian Software" class="auth-modal__logo" />
+        <img src="/logo.png" alt="Meridian Software" class="auth-modal__logo" decoding="async" loading="lazy" />
         <h2 class="auth-modal__title" id="auth-modal-title">Welcome</h2>
         <p class="auth-modal__subtitle">Sign in to access demos and personalized features</p>
 
@@ -71,10 +71,11 @@ let triggerElement = null;
 export function openAuthModal(source = 'unknown') {
   const modal = document.getElementById('auth-modal');
   if (!modal) return;
+  if (modal.classList.contains('open')) return;
   triggerElement = document.activeElement;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('scroll-locked');
+  lockBodyScroll();
   // Focus the close button so keyboard users have a sensible first focus.
   const closeBtn = document.getElementById('auth-modal-close');
   if (closeBtn) closeBtn.focus();
@@ -87,9 +88,10 @@ export function openAuthModal(source = 'unknown') {
 export function closeAuthModal() {
   const modal = document.getElementById('auth-modal');
   if (!modal) return;
+  if (!modal.classList.contains('open')) return;
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('scroll-locked');
+  unlockBodyScroll();
   if (triggerElement && typeof triggerElement.focus === 'function') {
     triggerElement.focus();
   }

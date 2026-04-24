@@ -12,6 +12,10 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overflow-x: hidden;
+  /* Prevents iOS Safari rubber-band bounce when the user scrolls past the
+     top/bottom of the page or on top of fixed overlays. */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -36,6 +40,16 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+  /* Kill iOS default highlight; components define their own active state. */
+  -webkit-tap-highlight-color: transparent;
+  /* Eliminates the 300ms tap delay on older mobile browsers and the
+     grey flash on modern ones. */
+  touch-action: manipulation;
+}
+
+a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 a {

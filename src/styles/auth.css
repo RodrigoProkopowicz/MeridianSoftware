@@ -24,6 +24,7 @@
   inset: 0;
   background: var(--color-overlay);
   backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .auth-modal__panel {
@@ -31,14 +32,18 @@
   z-index: var(--z-modal);
   width: 90%;
   max-width: 420px;
-  padding: var(--space-3xl);
+  max-height: calc(100vh - var(--space-2xl) * 2);
+  max-height: calc(100dvh - var(--space-2xl) * 2);
+  padding: clamp(var(--space-xl), 6vw, var(--space-3xl));
   background: var(--gradient-card);
   border: 1px solid var(--color-surface-glass-border);
   border-radius: var(--radius-xl);
   backdrop-filter: blur(var(--blur-lg));
+  -webkit-backdrop-filter: blur(var(--blur-lg));
   transform: scale(0.95) translateY(10px);
   transition: transform var(--transition-slow);
   box-shadow: var(--shadow-xl);
+  overflow-y: auto;
 }
 
 .auth-modal.open .auth-modal__panel {

@@ -1,0 +1,83 @@
+/* ============================================
+   Meridian Software — Stats Bar
+   ============================================ */
+
+.stats-bar {
+  padding: var(--space-3xl) 0;
+  position: relative;
+}
+
+.stats-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-glow);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.stats-bar__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xl);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.stats-bar__item {
+  padding: var(--space-lg) var(--space-md);
+  border-left: 1px solid rgba(232, 220, 200, 0.08);
+}
+
+.stats-bar__item:first-child {
+  border-left: none;
+}
+
+.stats-bar__value {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: var(--font-weight-extrabold);
+  line-height: 1;
+  letter-spacing: var(--letter-spacing-tight);
+  background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-accent-light) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: var(--space-sm);
+}
+
+.stats-bar__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+@media (max-width: 900px) {
+  .stats-bar__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+  }
+  .stats-bar__item {
+    border-left: none;
+    border-top: 1px solid rgba(232, 220, 200, 0.08);
+    padding: var(--space-md);
+  }
+  .stats-bar__item:first-child,
+  .stats-bar__item:nth-child(2) {
+    border-top: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .stats-bar__grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-bar__item,
+  .stats-bar__item:first-child,
+  .stats-bar__item:nth-child(2) {
+    border-top: 1px solid rgba(232, 220, 200, 0.08);
+  }
+  .stats-bar__item:first-child {
+    border-top: none;
+  }
+}

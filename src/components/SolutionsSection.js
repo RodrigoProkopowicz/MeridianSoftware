@@ -18,9 +18,9 @@ const SOLUTIONS = [
     title: 'Mobile Applications',
     description: 'Native and cross-platform mobile apps that deliver seamless user experiences on iOS and Android.',
     features: [
-      'iOS & Android development',
-      'React Native & Flutter',
-      'App Store optimization',
+      'Native iOS development in Swift',
+      'Native Android development in Kotlin',
+      'App Store & Play Store optimization',
       'Push notifications & analytics',
     ],
   },

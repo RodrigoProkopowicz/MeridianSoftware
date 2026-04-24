@@ -16,7 +16,7 @@ export function renderFooterSection() {
       <div class="container">
         <div class="footer-section__grid">
           <div class="footer-section__brand">
-            <img src="/logo.png" alt="Meridian Software" class="footer-section__brand-logo" />
+            <img src="/logo.png" alt="Meridian Software" class="footer-section__brand-logo" decoding="async" loading="lazy" />
             <p class="footer-section__brand-text">
               Building digital excellence through premium software solutions. 
               We partner with businesses to create impactful web and mobile experiences.

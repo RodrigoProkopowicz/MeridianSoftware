@@ -120,14 +120,10 @@
 /* ---- Reveal classes used by GSAP ---- */
 /* GSAP handles initial state (opacity/transform) inline.
    These classes are CSS markers only — no opacity:0 here
-   to prevent elements staying invisible if ScrollTrigger doesn't fire. */
-.reveal-element,
-.reveal-up,
-.reveal-left,
-.reveal-right,
-.reveal-scale {
-  will-change: transform, opacity;
-}
+   to prevent elements staying invisible if ScrollTrigger doesn't fire.
+   No permanent will-change either; GSAP promotes + unpromotes layers
+   automatically during tweens via force3D. Leaving will-change on
+   forever keeps the element on the compositor permanently and eats RAM. */
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {

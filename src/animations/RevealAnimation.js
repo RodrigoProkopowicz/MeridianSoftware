@@ -1,21 +1,33 @@
 /**
  * RevealAnimation.js
- * 
+ *
  * Reusable scroll-triggered reveal animations.
  * Sets initial state inline via GSAP and reveals on scroll.
+ *
+ * Mobile tunings: shorter durations + smaller transforms + tighter stagger.
+ * Reveal animations on mobile should feel snappy, not cinematic —
+ * otherwise users waiting for content to settle feel like the page is lagging.
  */
 
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+const isMobile = typeof window !== 'undefined'
+  && window.matchMedia('(max-width: 768px)').matches;
+
+const DURATION = isMobile ? 0.5 : 0.8;
+const STAGGER  = isMobile ? 0.08 : 0.15;
+const OFFSET_Y = isMobile ? 24 : 40;
+const OFFSET_X = isMobile ? 24 : 40;
+
 /**
  * Initializes reveal-on-scroll animations for all tagged elements.
  */
 export function initRevealAnimations() {
-  revealElements('.reveal-up', { y: 40, opacity: 0 });
-  revealElements('.reveal-left', { x: -40, opacity: 0 });
-  revealElements('.reveal-right', { x: 40, opacity: 0 });
-  revealElements('.reveal-scale', { scale: 0.85, opacity: 0 });
+  revealElements('.reveal-up', { y: OFFSET_Y, opacity: 0 });
+  revealElements('.reveal-left', { x: -OFFSET_X, opacity: 0 });
+  revealElements('.reveal-right', { x: OFFSET_X, opacity: 0 });
+  revealElements('.reveal-scale', { scale: 0.9, opacity: 0 });
   revealStaggeredCards();
   revealSectionHeaders();
 }
@@ -31,7 +43,7 @@ function revealElements(selector, fromVars, options = {}) {
   elements.forEach(element => {
     gsap.from(element, {
       ...fromVars,
-      duration: options.duration || 0.8,
+      duration: options.duration || DURATION,
       ease: options.ease || 'power2.out',
       scrollTrigger: {
         trigger: element,
@@ -50,7 +62,7 @@ function revealStaggeredCards() {
   if (cards.length === 0) return;
 
   // Set initial state
-  gsap.set(cards, { y: 50, opacity: 0 });
+  gsap.set(cards, { y: isMobile ? 24 : 50, opacity: 0 });
 
   ScrollTrigger.create({
     trigger: '.solutions-section__grid',
@@ -59,8 +71,8 @@ function revealStaggeredCards() {
       gsap.to(cards, {
         y: 0,
         opacity: 1,
-        duration: 0.7,
-        stagger: 0.15,
+        duration: isMobile ? 0.5 : 0.7,
+        stagger: STAGGER,
         ease: 'power2.out',
       });
     },
@@ -73,15 +85,15 @@ function revealStaggeredCards() {
  */
 function revealSectionHeaders() {
   const headers = document.querySelectorAll('.section-header');
-  
+
   headers.forEach(header => {
     const children = header.children;
 
     gsap.from(children, {
-      y: 30,
+      y: isMobile ? 18 : 30,
       opacity: 0,
-      duration: 0.7,
-      stagger: 0.12,
+      duration: isMobile ? 0.5 : 0.7,
+      stagger: isMobile ? 0.06 : 0.12,
       ease: 'power2.out',
       scrollTrigger: {
         trigger: header,

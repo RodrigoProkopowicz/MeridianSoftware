@@ -20,7 +20,7 @@
 .contact-section__layout {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  gap: var(--space-4xl);
+  gap: clamp(var(--space-2xl), 5vw, var(--space-4xl));
   align-items: start;
 }
 
@@ -87,7 +87,7 @@
 
 /* ---- Form ---- */
 .contact-section__form {
-  padding: var(--space-2xl);
+  padding: clamp(var(--space-lg), 4vw, var(--space-2xl));
 }
 
 .contact-section__form-row {
@@ -128,12 +128,14 @@
   font-size: var(--font-size-sm);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .contact-section__layout {
     grid-template-columns: 1fr;
     gap: var(--space-2xl);
   }
+}
 
+@media (max-width: 560px) {
   .contact-section__form-row {
     grid-template-columns: 1fr;
   }

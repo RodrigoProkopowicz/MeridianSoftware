@@ -11,6 +11,7 @@ body {
   color: var(--color-text-primary);
   background-color: var(--color-surface);
   overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* ---- Container ---- */
@@ -18,8 +19,8 @@ body {
   width: 100%;
   max-width: var(--container-max-width);
   margin: 0 auto;
-  padding-left: var(--container-padding);
-  padding-right: var(--container-padding);
+  padding-left: max(var(--container-padding), env(safe-area-inset-left));
+  padding-right: max(var(--container-padding), env(safe-area-inset-right));
 }
 
 /* ---- Section ---- */
@@ -27,12 +28,18 @@ body {
   padding-top: var(--section-padding-y);
   padding-bottom: var(--section-padding-y);
   position: relative;
+  /* content-visibility skips paint/layout for off-screen sections —
+     contain-intrinsic-size reserves approximate space so the scrollbar
+     stays stable. Huge boost on mobile where scroll jank comes from
+     repainting hidden sections. */
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 800px;
 }
 
 /* ---- Section Header ---- */
 .section-header {
   text-align: center;
-  margin-bottom: var(--space-4xl);
+  margin-bottom: clamp(var(--space-2xl), 6vw, var(--space-4xl));
 }
 
 .section-label {
@@ -73,7 +80,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  padding: 0.85rem 2rem;
+  padding: 0.85rem clamp(1.25rem, 3vw, 2rem);
   background: var(--gradient-accent);
   color: #fff;
   font-size: var(--font-size-sm);
@@ -117,7 +124,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  padding: 0.8rem 1.8rem;
+  padding: 0.8rem clamp(1.25rem, 2.5vw, 1.8rem);
   background: transparent;
   color: var(--color-secondary);
   font-size: var(--font-size-sm);
@@ -150,6 +157,7 @@ body {
   cursor: pointer;
   transition: all var(--transition-base);
   backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .button-icon:hover {
@@ -166,9 +174,32 @@ body {
   border: 1px solid rgba(232, 220, 200, 0.1);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
+  /* 16px on touch devices prevents iOS auto-zoom on focus. */
+  font-size: max(16px, var(--font-size-sm));
+  line-height: 1.4;
   transition: all var(--transition-base);
   backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Safari autofill: default yellow background breaks the dark theme.
+   Cannot override background directly (Safari blocks it), so we push the
+   brand surface through an inset box-shadow and recolour the text. */
+.input-field:-webkit-autofill,
+.input-field:-webkit-autofill:hover,
+.input-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px rgba(15, 25, 35, 0.95) inset;
+  caret-color: var(--color-text-primary);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+@media (min-width: 768px) {
+  .input-field {
+    font-size: var(--font-size-sm);
+  }
 }
 
 .input-field::placeholder {
@@ -249,18 +280,26 @@ textarea.input-field {
 /* ---- Toast notifications ---- */
 .toast-container {
   position: fixed;
-  bottom: var(--space-xl);
-  right: var(--space-xl);
+  bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+  right: max(var(--space-xl), env(safe-area-inset-right));
+  left: max(var(--space-xl), env(safe-area-inset-left));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.toast-container > * {
+  pointer-events: auto;
 }
 
 .toast {
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-md);
   backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
   border: 1px solid var(--color-surface-glass-border);
   font-size: var(--font-size-sm);
   animation: toastSlideIn 0.35s ease-out;
@@ -308,8 +347,16 @@ textarea.input-field {
   }
 }
 
-/* ---- Scroll locked state ---- */
+/* ---- Scroll locked state ----
+   position:fixed removes body from scroll flow entirely — bulletproof on
+   iOS Safari where overflow:hidden leaks touch scroll to the html element.
+   `top: -{scrollY}px` is set inline by lockBodyScroll() in DomHelper.js
+   so the user appears to stay at their scroll position. */
 body.scroll-locked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
   overflow: hidden;
 }
 
