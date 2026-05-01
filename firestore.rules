@@ -121,6 +121,17 @@ service cloud.firestore {
                          && request.resource.data.size() < 30;
         allow update, delete: if false;
       }
+
+      // ---- suppliers ----
+      match /suppliers/{supplierId} {
+        allow read:   if isOwner(businessOwner(businessId));
+        allow create: if isOwner(businessOwner(businessId))
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 30;
+        allow update: if isOwner(businessOwner(businessId))
+                         && request.resource.data.size() < 30;
+        allow delete: if isOwner(businessOwner(businessId));
+      }
     }
 
     // Default deny
