@@ -25,6 +25,7 @@
     "cleanUrls": true,
     "trailingSlash": false,
     "rewrites": [
+      { "source": "/stock-manager/**", "destination": "/stock-manager/index.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
