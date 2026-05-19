@@ -1,21 +1,17 @@
 /**
  * Cloud Functions — reCAPTCHA Enterprise assessment
  *
- * Fires on every new document in `contactSubmissions` and `demoRequests`.
- * Reads the client-generated `recaptchaToken`, asks the reCAPTCHA Enterprise
- * API to score it, then:
+ * Fires on every new document in `demoRequests`. Reads the client-generated
+ * `recaptchaToken`, asks the reCAPTCHA Enterprise API to score it, then:
  *   - Marks the doc with the score for auditability.
- *   - Sets status = 'spam' and deletes tokens below SCORE_THRESHOLD.
+ *   - Deletes the doc when the score is below SCORE_THRESHOLD.
  *
- * The request body uses the exact shape the reCAPTCHA docs specify:
- *   {
- *     event: { token, expectedAction, siteKey }
- *   }
+ * El formulario de contacto NO usa Firestore: arma un mailto: del lado del
+ * cliente y abre el cliente de email del usuario, así no necesitamos SMTP.
  */
 
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
 initializeApp();
@@ -99,22 +95,6 @@ async function applyAssessment(snap, expectedAction) {
 }
 
 /**
- * Contact form submissions.
- */
-exports.validateContactRecaptcha = onDocumentCreated(
-  'contactSubmissions/{id}',
-  async (event) => {
-    const snap = event.data;
-    if (!snap) return;
-    try {
-      await applyAssessment(snap, 'CONTACT_SUBMIT');
-    } catch (err) {
-      console.error('validateContactRecaptcha: assessment failed', err);
-    }
-  }
-);
-
-/**
  * Demo request submissions.
  */
 exports.validateDemoRecaptcha = onDocumentCreated(
@@ -129,3 +109,16 @@ exports.validateDemoRecaptcha = onDocumentCreated(
     }
   }
 );
+
+// ============================================================
+// Stock Manager — AFIP facturación electrónica
+// ============================================================
+const afip = require('./afip');
+exports.saveAfipConfig      = afip.saveAfipConfig;
+exports.clearAfipConfig     = afip.clearAfipConfig;
+exports.getAfipStatus       = afip.getAfipStatus;
+exports.testAfipConnection  = afip.testAfipConnection;
+exports.getAfipLastNumber   = afip.getAfipLastNumber;
+exports.requestAfipCAE      = afip.requestAfipCAE;
+exports.lookupCuitPadron    = afip.lookupCuitPadron;
+exports.setupAfipExpress    = afip.setupAfipExpress;

@@ -13,27 +13,27 @@
 
 const TESTIMONIALS = [
   {
-    quote: "Meridian shipped our rebuild in ten weeks. The team handled the ambiguous parts without hand-holding — we finally have a partner that thinks about our product, not just the ticket.",
+    quote: "Meridian entregó nuestro rebuild en diez semanas. El equipo manejó las partes ambiguas sin necesidad de supervisión — por fin tenemos un partner que piensa en nuestro producto, no solo en el ticket.",
     author: 'Sofía Reyes',
-    role: 'VP Engineering',
+    role: 'VP de Ingeniería',
     company: 'Helix Retail',
   },
   {
-    quote: "They replaced our offshore agency mid-project. Within a month our staging environment was faster, our tests actually ran, and the roadmap was realistic for the first time.",
+    quote: "Reemplazaron a nuestra agencia offshore en medio del proyecto. En un mes nuestro entorno de staging era más rápido, los tests realmente corrían y el roadmap fue realista por primera vez.",
     author: 'Marcus Tanaka',
     role: 'CTO',
     company: 'Kepler Finance',
   },
   {
-    quote: "The engineering quality is the headline, but the communication is what made it stick. Weekly demos, honest estimates, clean PRs. I'd hire them again tomorrow.",
+    quote: "La calidad de ingeniería es lo que más se nota, pero la comunicación es lo que la sostiene. Demos semanales, estimaciones honestas, PRs prolijos. Los volvería a contratar mañana.",
     author: 'Priya Nair',
     role: 'Head of Product',
     company: 'Orbit Health',
   },
   {
-    quote: "We went from a three-month backlog to shipping weekly. Meridian didn't rewrite our codebase — they made it boring in all the right ways.",
+    quote: "Pasamos de un backlog de tres meses a entregar semanalmente. Meridian no reescribió nuestro código — lo hizo aburrido en el mejor sentido.",
     author: 'James Okafor',
-    role: 'Founder',
+    role: 'Fundador',
     company: 'Vantage Studio',
   },
 ];
@@ -53,16 +53,16 @@ export function renderTestimonialsSection() {
     .map((_, i) => `
       <button class="testimonials__dot ${i === 0 ? 'active' : ''}"
               data-slide="${i}"
-              aria-label="Testimonial ${i + 1} of ${TESTIMONIALS.length}"></button>
+              aria-label="Testimonio ${i + 1} de ${TESTIMONIALS.length}"></button>
     `)
     .join('');
 
   return `
-    <section class="testimonials section" id="testimonials" aria-label="Client testimonials">
+    <section class="testimonials section" id="testimonials" aria-label="Testimonios de clientes">
       <div class="container">
         <div class="section-header">
-          <span class="section-label">What clients say</span>
-          <h2 class="section-title">Built on trust, measured in outcomes</h2>
+          <span class="section-label">Qué dicen los clientes</span>
+          <h2 class="section-title">Construido sobre confianza, medido en resultados</h2>
         </div>
 
         <div class="testimonials__carousel"
@@ -74,12 +74,12 @@ export function renderTestimonialsSection() {
             ${slidesHTML}
           </div>
 
-          <button class="testimonials__nav testimonials__nav--prev" id="testimonials-prev" aria-label="Previous testimonial">
+          <button class="testimonials__nav testimonials__nav--prev" id="testimonials-prev" aria-label="Testimonio anterior">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6"/>
             </svg>
           </button>
-          <button class="testimonials__nav testimonials__nav--next" id="testimonials-next" aria-label="Next testimonial">
+          <button class="testimonials__nav testimonials__nav--next" id="testimonials-next" aria-label="Testimonio siguiente">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"/>
             </svg>

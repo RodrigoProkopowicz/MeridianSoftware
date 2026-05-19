@@ -15,49 +15,49 @@ const SOLUTIONS = [
   {
     id: 'mobile-apps',
     icon: '📱',
-    title: 'Mobile Applications',
-    description: 'Native and cross-platform mobile apps that deliver seamless user experiences on iOS and Android.',
+    title: 'Aplicaciones móviles',
+    description: 'Apps nativas y multiplataforma que ofrecen una experiencia fluida en iOS y Android.',
     features: [
-      'Native iOS development in Swift',
-      'Native Android development in Kotlin',
-      'App Store & Play Store optimization',
-      'Push notifications & analytics',
+      'Desarrollo nativo iOS en Swift',
+      'Desarrollo nativo Android en Kotlin',
+      'Optimización para App Store y Play Store',
+      'Notificaciones push y analítica',
     ],
   },
   {
     id: 'web-platforms',
     icon: '🌐',
-    title: 'Web Platforms',
-    description: 'Scalable, high-performance web applications and platforms built with modern frameworks.',
+    title: 'Plataformas web',
+    description: 'Aplicaciones web escalables y de alto rendimiento construidas con frameworks modernos.',
     features: [
       'Progressive Web Apps',
-      'SaaS platforms',
-      'E-commerce solutions',
-      'Real-time dashboards',
+      'Plataformas SaaS',
+      'Soluciones de e-commerce',
+      'Dashboards en tiempo real',
     ],
   },
   {
     id: 'cloud-devops',
     icon: '☁️',
-    title: 'Cloud & DevOps',
-    description: 'Cloud infrastructure, CI/CD pipelines, and DevOps practices that ensure reliability at scale.',
+    title: 'Cloud y DevOps',
+    description: 'Infraestructura cloud, pipelines de CI/CD y prácticas DevOps para asegurar la fiabilidad a escala.',
     features: [
-      'AWS, GCP & Azure',
-      'Docker & Kubernetes',
-      'CI/CD automation',
-      'Monitoring & observability',
+      'AWS, GCP y Azure',
+      'Docker y Kubernetes',
+      'Automatización de CI/CD',
+      'Monitoreo y observabilidad',
     ],
   },
   {
     id: 'custom-software',
     icon: '⚙️',
-    title: 'Custom Software',
-    description: 'Tailored software solutions designed to solve your unique business challenges from the ground up.',
+    title: 'Software a medida',
+    description: 'Soluciones diseñadas desde cero para resolver desafíos específicos de tu negocio.',
     features: [
-      'Requirements analysis',
-      'System architecture design',
-      'API integrations',
-      'Legacy modernization',
+      'Análisis de requisitos',
+      'Diseño de arquitectura',
+      'Integraciones de API',
+      'Modernización de sistemas legacy',
     ],
   },
 ];
@@ -73,11 +73,11 @@ export function renderSolutionsSection() {
     <section class="solutions-section section" id="solutions">
       <div class="container">
         <div class="section-header">
-          <span class="section-label">What We Do</span>
-          <h2 class="section-title">Our Solutions</h2>
+          <span class="section-label">Servicios a medida</span>
+          <h2 class="section-title">Lo que hacemos</h2>
           <p class="section-subtitle">
-            End-to-end software solutions engineered for performance, 
-            scalability, and exceptional user experience.
+            Soluciones de software end-to-end diseñadas para rendimiento,
+            escalabilidad y una experiencia de usuario excepcional.
           </p>
         </div>
         <div class="solutions-section__grid">

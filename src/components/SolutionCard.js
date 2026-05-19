@@ -33,9 +33,9 @@ export function renderSolutionCard(solution) {
       <div class="solution-card__features">
         ${featuresHTML}
       </div>
-      <button class="button-primary solution-card__cta" 
+      <button class="button-primary solution-card__cta"
               data-demo-trigger="${solution.id}">
-        Request Demo
+        Solicitar consulta
       </button>
     </div>
   `;

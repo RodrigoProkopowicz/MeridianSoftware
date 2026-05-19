@@ -11,10 +11,10 @@
 
 /** TODO — replace with real metrics before going live. */
 const STATS = [
-  { value: 47,  suffix: '',  label: 'Projects delivered' },
-  { value: 98,  suffix: '%', label: 'Client retention' },
-  { value: 24,  suffix: 'h', label: 'Average response time' },
-  { value: 12,  suffix: '',  label: 'Industries served' },
+  { value: 47,  suffix: '',  label: 'Proyectos entregados' },
+  { value: 98,  suffix: '%', label: 'Retención de clientes' },
+  { value: 24,  suffix: 'h', label: 'Tiempo de respuesta' },
+  { value: 12,  suffix: '',  label: 'Industrias atendidas' },
 ];
 
 /**

@@ -79,9 +79,9 @@ export function renderTrustBarSection() {
     .join('');
 
   return `
-    <section class="trust-bar" id="trust-bar" aria-label="Companies we work with">
+    <section class="trust-bar" id="trust-bar" aria-label="Empresas con las que trabajamos">
       <div class="container">
-        <p class="trust-bar__label">Trusted by teams shipping at every scale</p>
+        <p class="trust-bar__label">Equipos que entregan a cualquier escala confían en nosotros</p>
         <div class="trust-bar__logos">
           ${logosHTML}
         </div>

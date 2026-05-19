@@ -18,35 +18,36 @@ export function renderFooterSection() {
           <div class="footer-section__brand">
             <img src="/logo.png" alt="Meridian Software" class="footer-section__brand-logo" decoding="async" loading="lazy" />
             <p class="footer-section__brand-text">
-              Building digital excellence through premium software solutions. 
-              We partner with businesses to create impactful web and mobile experiences.
+              Construimos excelencia digital con soluciones de software premium.
+              Acompañamos empresas en crear experiencias web y móviles de impacto.
             </p>
           </div>
 
           <div class="footer-section__col">
-            <h4 class="footer-section__heading">Solutions</h4>
+            <h4 class="footer-section__heading">Productos</h4>
             <nav class="footer-section__links">
-              <a href="#solutions" class="footer-section__link">Mobile Applications</a>
-              <a href="#solutions" class="footer-section__link">Web Platforms</a>
-              <a href="#solutions" class="footer-section__link">Cloud & DevOps</a>
-              <a href="#solutions" class="footer-section__link">Custom Software</a>
+              <a href="#products" class="footer-section__link">Stock Manager</a>
+              <a href="#products" class="footer-section__link">Medicus</a>
+              <a href="#solutions" class="footer-section__link">Aplicaciones móviles</a>
+              <a href="#solutions" class="footer-section__link">Software a medida</a>
             </nav>
           </div>
 
           <div class="footer-section__col">
-            <h4 class="footer-section__heading">Company</h4>
+            <h4 class="footer-section__heading">Empresa</h4>
             <nav class="footer-section__links">
-              <a href="#hero" class="footer-section__link">About Us</a>
-              <a href="#contact" class="footer-section__link">Contact</a>
-              <a href="#demo" class="footer-section__link">Request Demo</a>
-              <a href="#" class="footer-section__link">Privacy Policy</a>
+              <a href="#hero" class="footer-section__link">Sobre nosotros</a>
+              <a href="#contact" class="footer-section__link">Contacto</a>
+              <a href="#demo" class="footer-section__link">Solicitar demo</a>
+              <a href="/terms" class="footer-section__link">Términos y Condiciones</a>
+              <a href="/privacy" class="footer-section__link">Política de Privacidad</a>
             </nav>
           </div>
         </div>
 
         <div class="footer-section__bottom">
           <p class="footer-section__copyright">
-            &copy; ${currentYear} Meridian Software. All rights reserved.
+            &copy; ${currentYear} Meridian Software. Todos los derechos reservados.
           </p>
           <div class="footer-section__social">
             <button class="button-icon" aria-label="LinkedIn">

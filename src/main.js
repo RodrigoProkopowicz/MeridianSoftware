@@ -15,6 +15,7 @@ import './styles/hero.css';
 import './styles/device-scene.css';
 import './styles/trust-bar.css';
 import './styles/solutions.css';
+import './styles/products.css';
 import './styles/case-studies.css';
 import './styles/stats-bar.css';
 import './styles/testimonials.css';
@@ -28,6 +29,7 @@ import { renderNavigationBar, initNavigationBar } from './components/NavigationB
 import { renderHeroSection, initHeroSection } from './components/HeroSection.js';
 import { renderTrustBarSection } from './components/TrustBarSection.js';
 import { renderSolutionsSection, initSolutionsSection } from './components/SolutionsSection.js';
+import { renderProductsSection, initProductsSection } from './components/ProductsSection.js';
 import { renderCaseStudiesSection, initCaseStudiesSection } from './components/CaseStudiesSection.js';
 import { renderStatsBar } from './components/StatsBar.js';
 import { renderTestimonialsSection, initTestimonialsSection } from './components/TestimonialsSection.js';
@@ -62,6 +64,7 @@ function initializeApplication() {
     <main>
       ${renderHeroSection()}
       ${renderTrustBarSection()}
+      ${renderProductsSection()}
       ${renderSolutionsSection()}
       ${renderCaseStudiesSection()}
       ${renderStatsBar()}
@@ -79,6 +82,7 @@ function initializeApplication() {
   // 3. Initialize all component event listeners
   initNavigationBar();
   initHeroSection();
+  initProductsSection(openAuthModal);
   initSolutionsSection(openAuthModal);
   initCaseStudiesSection();
   initTestimonialsSection();

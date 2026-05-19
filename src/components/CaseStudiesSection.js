@@ -17,30 +17,30 @@ const CASE_STUDIES = [
   {
     id: 'retail-checkout',
     industry: 'Retail',
-    title: 'Cut checkout drop-off for a 200-store chain',
-    summary: 'Rebuilt a legacy React Native app with offline-first sync and a streamlined cart.',
+    title: 'Reducimos el abandono de checkout en una cadena de 200 sucursales',
+    summary: 'Rehicimos una app React Native legacy con sincronización offline-first y un carrito simplificado.',
     metric: '43%',
-    metricLabel: 'faster checkout',
+    metricLabel: 'más rápido el checkout',
     accent: 'blue',
-    tags: ['React Native', 'Firebase', 'Offline sync'],
+    tags: ['React Native', 'Firebase', 'Sync offline'],
   },
   {
     id: 'fintech-dashboard',
     industry: 'Fintech',
-    title: 'Real-time portfolio dashboard for 40k traders',
-    summary: 'Streaming prices via WebSockets with sub-100ms refresh on a Vue + Rust backend.',
+    title: 'Dashboard de portafolio en tiempo real para 40k traders',
+    summary: 'Streaming de precios vía WebSockets con refresco sub-100ms sobre un backend Vue + Rust.',
     metric: '92ms',
-    metricLabel: 'p95 latency',
+    metricLabel: 'latencia p95',
     accent: 'green',
     tags: ['Vue 3', 'WebSocket', 'Rust', 'PostgreSQL'],
   },
   {
     id: 'health-patient',
-    industry: 'Health',
-    title: 'HIPAA-compliant telehealth platform',
-    summary: 'End-to-end encrypted video + EHR integrations shipped in under four months.',
-    metric: '4mo',
-    metricLabel: 'from kickoff to launch',
+    industry: 'Salud',
+    title: 'Plataforma de telemedicina HIPAA-compliant',
+    summary: 'Video cifrado end-to-end e integraciones EHR entregadas en menos de cuatro meses.',
+    metric: '4 meses',
+    metricLabel: 'de kickoff a lanzamiento',
     accent: 'amber',
     tags: ['WebRTC', 'HIPAA', 'Next.js', 'AWS'],
   },
@@ -56,11 +56,12 @@ export function renderCaseStudiesSection() {
   return `
     <section class="case-studies section" id="case-studies">
       <div class="container">
+        <div class="section-label-wrapper"></div>
         <div class="section-header">
-          <span class="section-label">Proof</span>
-          <h2 class="section-title">Work that ships and scales</h2>
+          <span class="section-label">Casos reales</span>
+          <h2 class="section-title">Software que se entrega y escala</h2>
           <p class="section-subtitle">
-            A selection of projects — each one launched, measured, and maintained.
+            Una selección de proyectos — cada uno lanzado, medido y mantenido.
           </p>
         </div>
         <div class="case-studies__grid">

@@ -35,17 +35,49 @@ service cloud.firestore {
       return field is string && field.size() > 0 && field.size() <= maxLen;
     }
 
+    // Super-admin global. Source of truth: users/{uid}.role == 'admin'.
+    // Se setea manualmente desde Firebase Console — la app no expone toggle.
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // ---- users/{uid} ----
     // Profile is created and maintained by AuthenticationService.createOrUpdateUserProfile
     match /users/{uid} {
-      allow read:   if isOwner(uid);
+      allow read:   if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid)
                        && hasOnlyFields(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
                        && payloadSizeOK();
-      allow update: if isOwner(uid)
-                       && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
-                       && payloadSizeOK();
+      // Owner puede actualizar los campos originales sin tocar `role` (lo mantiene
+      // como estaba o lo deja ausente). Admin puede modificar `role`.
+      allow update: if (isOwner(uid)
+                         && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role'])
+                         && request.resource.data.get('role', null) == resource.data.get('role', null)
+                         && payloadSizeOK())
+                      || (isAdmin()
+                           && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role']));
       allow delete: if false;
+
+      // ---- users/{uid}/demoAccess/{productId} ----
+      // Self-service 7-day demo grant for in-house products (stock-manager, medicus).
+      // Doc se crea cuando el usuario activa la demo desde meridian-software.com
+      // (capped a 7 días). El admin puede crear/extender/revocar sin cap.
+      match /demoAccess/{productId} {
+        allow read:   if isOwner(uid) || isAdmin();
+        allow create: if (isOwner(uid)
+                           && (productId == 'stock-manager' || productId == 'medicus')
+                           && request.resource.data.keys().hasOnly(['productId','grantedAt','expiresAt','status'])
+                           && request.resource.data.productId == productId
+                           && request.resource.data.status == 'active'
+                           && request.resource.data.expiresAt is timestamp
+                           && request.resource.data.expiresAt.toMillis() <= request.time.toMillis() + (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 1000)
+                           && request.resource.data.expiresAt.toMillis() >= request.time.toMillis())
+                        || isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
     }
 
     // ---- demoRequests/{id} ----
@@ -64,17 +96,10 @@ service cloud.firestore {
     }
 
     // ---- contactSubmissions/{id} ----
-    // Open to anonymous creation (contact form); not readable from client.
+    // El formulario de contacto pasó a usar mailto: del lado del cliente.
+    // Ya no recibimos submissions acá — bloqueamos todo.
     match /contactSubmissions/{id} {
-      allow read:   if false;
-      allow create: if hasOnlyFields(['name','email','company','message','status','recaptchaToken','createdAt'])
-                       && isNonEmptyString(request.resource.data.name, 200)
-                       && isNonEmptyString(request.resource.data.email, 200)
-                       && isNonEmptyString(request.resource.data.message, 5000)
-                       && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
-                       && request.resource.data.status == 'new'
-                       && payloadSizeOK();
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     // ============================================================
@@ -90,47 +115,214 @@ service cloud.firestore {
     }
 
     match /businesses/{businessId} {
+      allow read:   if isOwner(resource.data.ownerId) || isAdmin();
+      allow create: if (isSignedIn()
+                         && request.resource.data.ownerId == request.auth.uid
+                         && request.resource.data.keys().hasOnly(['ownerId','name','currency','createdAt','updatedAt'])
+                         && isNonEmptyString(request.resource.data.name, 120)
+                         && isNonEmptyString(request.resource.data.currency, 8))
+                      || isAdmin();
+      allow update: if (isOwner(resource.data.ownerId)
+                         && request.resource.data.ownerId == resource.data.ownerId
+                         && request.resource.data.size() < 30)
+                      || isAdmin();
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+
+      // ---- products ----
+      match /products/{productId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 30;
+        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.size() < 30;
+        allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
+      }
+
+      // ---- movements ----
+      // Inmutables para el owner (solo create + read). Admin tiene bypass para
+      // soporte: puede update/delete movements de comercios ajenos.
+      match /movements/{movementId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.size() < 30;
+        allow update, delete: if isAdmin();
+      }
+
+      // ---- suppliers ----
+      match /suppliers/{supplierId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 30;
+        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.size() < 30;
+        allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
+      }
+
+      // ---- clients (destinatarios de facturas) ----
+      match /clients/{clientId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 30;
+        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.size() < 30;
+        allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
+      }
+
+      // ---- invoices (comprobantes de venta) ----
+      // Las facturas son casi inmutables para el owner: solo se permite cambiar
+      // status / cancelReason (número y totales son inmutables). Admin tiene
+      // bypass total para soporte (incluido delete, que el owner no puede).
+      match /invoices/{invoiceId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.size() < 40;
+        allow update: if (isOwner(businessOwner(businessId))
+                           && request.resource.data.size() < 40
+                           // Inmutables: número, totales, items, fecha de emisión
+                           && request.resource.data.number == resource.data.number
+                           && request.resource.data.numberInt == resource.data.numberInt
+                           && request.resource.data.total == resource.data.total
+                           && request.resource.data.subtotal == resource.data.subtotal)
+                        || isAdmin();
+        allow delete: if isAdmin();
+      }
+
+      // ---- counters (numeración de comprobantes) ----
+      match /counters/{counterId} {
+        allow read:           if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create, update: if (isOwner(businessOwner(businessId)) || isAdmin())
+                                  && request.resource.data.size() < 10;
+        allow delete:         if isAdmin();
+      }
+
+      // ---- secrets (AFIP cert/key/tokens) ----
+      // SOLO accesible vía Cloud Functions (admin SDK bypassea reglas).
+      // El cliente NUNCA debe leer ni escribir esto directamente, ni siquiera
+      // el super-admin global — usar las callables `saveAfipConfig`, etc.
+      match /secrets/{secretId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ============================================================
+    // Medicus — clinics + subcolecciones
+    // Usado por /medicus (Vite app aparte, mismo proyecto Firebase).
+    // Modelo:
+    //   clinics/{clinicId}                                   ← ownerId = uid
+    //     └─ patients/{patientId}
+    //         └─ visits/{visitId}                            ← ficha clínica
+    //     └─ appointments/{appointmentId}                    ← turnos
+    //     └─ transactions/{transactionId}                    ← finanzas
+    // ============================================================
+
+    function clinicOwner(clinicId) {
+      return get(/databases/$(database)/documents/clinics/$(clinicId)).data.ownerId;
+    }
+
+    match /clinics/{clinicId} {
       allow read:   if isOwner(resource.data.ownerId);
       allow create: if isSignedIn()
                        && request.resource.data.ownerId == request.auth.uid
-                       && request.resource.data.keys().hasOnly(['ownerId','name','currency','createdAt','updatedAt'])
                        && isNonEmptyString(request.resource.data.name, 120)
-                       && isNonEmptyString(request.resource.data.currency, 8);
+                       && request.resource.data.size() < 30;
       allow update: if isOwner(resource.data.ownerId)
                        && request.resource.data.ownerId == resource.data.ownerId
                        && request.resource.data.size() < 30;
       allow delete: if isOwner(resource.data.ownerId);
 
-      // ---- products ----
-      match /products/{productId} {
-        allow read:   if isOwner(businessOwner(businessId));
-        allow create: if isOwner(businessOwner(businessId))
-                         && isNonEmptyString(request.resource.data.name, 200)
-                         && request.resource.data.size() < 30;
-        allow update: if isOwner(businessOwner(businessId))
-                         && request.resource.data.size() < 30;
-        allow delete: if isOwner(businessOwner(businessId));
+      // ---- patients (HC — protegidos por Ley 26.529) ----
+      // Inmutabilidad parcial:
+      //  - Hard delete prohibido — usar soft delete vía update (deletedAt).
+      //  - createdBy/createdAt no se pueden alterar una vez seteados (la app
+      //    se los pone en create; docs viejos pueden no tenerlos y la regla
+      //    deja que el migrador los rellene).
+      //  - revisionCount monótono — solo se mantiene o crece de a uno.
+      //  - El snapshot del estado previo se escribe en subcolección
+      //    `revisions/{revId}` (inmutable, ver match más abajo).
+      match /patients/{patientId} {
+        allow read:   if isOwner(clinicOwner(clinicId));
+        allow create: if isOwner(clinicOwner(clinicId))
+                         && isNonEmptyString(request.resource.data.firstName, 80)
+                         && isNonEmptyString(request.resource.data.lastName, 80)
+                         && request.resource.data.size() < 40;
+        allow update: if isOwner(clinicOwner(clinicId))
+                         && request.resource.data.size() < 40
+                         && (!('createdBy' in resource.data)
+                             || request.resource.data.createdBy == resource.data.createdBy)
+                         && (!('createdAt' in resource.data)
+                             || request.resource.data.createdAt == resource.data.createdAt)
+                         && (!('revisionCount' in resource.data)
+                             || request.resource.data.revisionCount == resource.data.revisionCount
+                             || request.resource.data.revisionCount == resource.data.revisionCount + 1);
+        // Hard delete prohibido. Usar soft delete (update con deletedAt).
+        allow delete: if false;
+
+        // ---- patient revisions (inmutables) ----
+        match /revisions/{revId} {
+          allow read:   if isOwner(clinicOwner(clinicId));
+          allow create: if isOwner(clinicOwner(clinicId))
+                           && request.resource.data.revisedBy == request.auth.uid
+                           && request.resource.data.size() < 35;
+          allow update, delete: if false;
+        }
+
+        // ---- visits (ficha clínica del paciente) ----
+        // Mismas restricciones que el paciente: inmutabilidad parcial y
+        // revisiones inmutables. Cada visita es una entrada de la HC.
+        match /visits/{visitId} {
+          allow read:   if isOwner(clinicOwner(clinicId));
+          allow create: if isOwner(clinicOwner(clinicId))
+                           && request.resource.data.size() < 30;
+          allow update: if isOwner(clinicOwner(clinicId))
+                           && request.resource.data.size() < 30
+                           && (!('createdBy' in resource.data)
+                               || request.resource.data.createdBy == resource.data.createdBy)
+                           && (!('createdAt' in resource.data)
+                               || request.resource.data.createdAt == resource.data.createdAt)
+                           && (!('revisionCount' in resource.data)
+                               || request.resource.data.revisionCount == resource.data.revisionCount
+                               || request.resource.data.revisionCount == resource.data.revisionCount + 1);
+          // Hard delete prohibido. Usar soft delete.
+          allow delete: if false;
+
+          // ---- visit revisions (inmutables) ----
+          match /revisions/{revId} {
+            allow read:   if isOwner(clinicOwner(clinicId));
+            allow create: if isOwner(clinicOwner(clinicId))
+                             && request.resource.data.revisedBy == request.auth.uid
+                             && request.resource.data.size() < 25;
+            allow update, delete: if false;
+          }
+        }
       }
 
-      // ---- movements ----
-      // Inmutables: solo create + read.
-      match /movements/{movementId} {
-        allow read:   if isOwner(businessOwner(businessId));
-        allow create: if isOwner(businessOwner(businessId))
-                         && request.resource.data.userId == request.auth.uid
+      // ---- appointments (turnos) ----
+      match /appointments/{appointmentId} {
+        allow read:   if isOwner(clinicOwner(clinicId));
+        allow create: if isOwner(clinicOwner(clinicId))
+                         && isNonEmptyString(request.resource.data.patientId, 200)
                          && request.resource.data.size() < 30;
-        allow update, delete: if false;
+        allow update: if isOwner(clinicOwner(clinicId))
+                         && request.resource.data.size() < 30;
+        allow delete: if isOwner(clinicOwner(clinicId));
       }
 
-      // ---- suppliers ----
-      match /suppliers/{supplierId} {
-        allow read:   if isOwner(businessOwner(businessId));
-        allow create: if isOwner(businessOwner(businessId))
-                         && isNonEmptyString(request.resource.data.name, 200)
+      // ---- transactions (finanzas) ----
+      match /transactions/{transactionId} {
+        allow read:   if isOwner(clinicOwner(clinicId));
+        allow create: if isOwner(clinicOwner(clinicId))
+                         && (request.resource.data.type == 'income' || request.resource.data.type == 'expense')
+                         && request.resource.data.amount is number
+                         && request.resource.data.amount > 0
                          && request.resource.data.size() < 30;
-        allow update: if isOwner(businessOwner(businessId))
+        allow update: if isOwner(clinicOwner(clinicId))
                          && request.resource.data.size() < 30;
-        allow delete: if isOwner(businessOwner(businessId));
+        allow delete: if isOwner(clinicOwner(clinicId));
       }
     }
 

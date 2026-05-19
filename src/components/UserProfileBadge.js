@@ -65,7 +65,7 @@ function renderLoggedInState(container, user) {
         <div class="user-profile-badge__dropdown-name">${displayName}</div>
         <div class="user-profile-badge__dropdown-email">${email}</div>
       </div>
-      <button class="user-profile-badge__dropdown-item" id="sign-out-button">Sign Out</button>
+      <button class="user-profile-badge__dropdown-item" id="sign-out-button">Cerrar sesión</button>
     </div>
   `;
 
@@ -90,10 +90,10 @@ function renderLoggedInState(container, user) {
       try {
         await signOut();
         trackEvent(AnalyticsEvent.LOGOUT);
-        showToast('Signed out successfully', 'success');
+        showToast('Sesión cerrada', 'success');
       } catch (error) {
         console.error('UserProfileBadge: Sign out failed', error);
-        showToast('Failed to sign out', 'error');
+        showToast('No pudimos cerrar la sesión', 'error');
       }
     });
   }
@@ -107,7 +107,7 @@ function renderLoggedInState(container, user) {
 function renderLoggedOutState(container, openAuthModal) {
   container.innerHTML = `
     <button class="button-secondary" id="navbar-sign-in-button" style="padding: 0.5rem 1.2rem; font-size: var(--font-size-xs);">
-      Sign In
+      Iniciar sesión
     </button>
   `;
 

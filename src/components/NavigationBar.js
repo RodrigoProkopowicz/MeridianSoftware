@@ -16,20 +16,21 @@ export function renderNavigationBar() {
   return `
     <nav class="navigation-bar" id="navigation-bar">
       <div class="container navigation-bar__inner">
-        <a href="#hero" class="navigation-bar__logo" aria-label="Meridian Software Home">
+        <a href="#hero" class="navigation-bar__logo" aria-label="Inicio Meridian Software">
           <img src="/logo.png" alt="Meridian Software" decoding="async" fetchpriority="high" />
         </a>
 
         <div class="navigation-bar__links hide-mobile">
-          <a href="#hero" class="navigation-bar__link active" data-section="hero">Home</a>
-          <a href="#solutions" class="navigation-bar__link" data-section="solutions">Solutions</a>
+          <a href="#hero" class="navigation-bar__link active" data-section="hero">Inicio</a>
+          <a href="#products" class="navigation-bar__link" data-section="products">Productos</a>
+          <a href="#solutions" class="navigation-bar__link" data-section="solutions">Servicios</a>
           <a href="#demo" class="navigation-bar__link" data-section="demo">Demo</a>
-          <a href="#contact" class="navigation-bar__link" data-section="contact">Contact</a>
+          <a href="#contact" class="navigation-bar__link" data-section="contact">Contacto</a>
         </div>
 
         <div class="navigation-bar__actions">
           ${renderUserProfileBadge()}
-          <button class="navigation-bar__hamburger" id="hamburger-button" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
+          <button class="navigation-bar__hamburger" id="hamburger-button" aria-label="Abrir menú" aria-expanded="false" aria-controls="mobile-menu">
             <span></span>
             <span></span>
             <span></span>
@@ -38,10 +39,11 @@ export function renderNavigationBar() {
       </div>
 
       <div class="navigation-bar__mobile-menu" id="mobile-menu">
-        <a href="#hero" class="navigation-bar__link" data-section="hero" data-mobile-link>Home</a>
-        <a href="#solutions" class="navigation-bar__link" data-section="solutions" data-mobile-link>Solutions</a>
+        <a href="#hero" class="navigation-bar__link" data-section="hero" data-mobile-link>Inicio</a>
+        <a href="#products" class="navigation-bar__link" data-section="products" data-mobile-link>Productos</a>
+        <a href="#solutions" class="navigation-bar__link" data-section="solutions" data-mobile-link>Servicios</a>
         <a href="#demo" class="navigation-bar__link" data-section="demo" data-mobile-link>Demo</a>
-        <a href="#contact" class="navigation-bar__link" data-section="contact" data-mobile-link>Contact</a>
+        <a href="#contact" class="navigation-bar__link" data-section="contact" data-mobile-link>Contacto</a>
       </div>
     </nav>
   `;
@@ -101,7 +103,7 @@ function closeMobileMenu() {
 }
 
 function initScrollSpy() {
-  const sectionIds = ['hero', 'solutions', 'demo', 'contact'];
+  const sectionIds = ['hero', 'products', 'solutions', 'demo', 'contact'];
   const sections = sectionIds
     .map(id => document.getElementById(id))
     .filter(Boolean);

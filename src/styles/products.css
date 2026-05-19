@@ -1,0 +1,193 @@
+/* ============================================
+   Meridian Software — Products Section
+   In-house SaaS products (Stock Manager, Medicus)
+   ============================================ */
+
+.products-section {
+  background: var(--color-surface);
+  position: relative;
+}
+
+.products-section::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  right: -10%;
+  width: min(700px, 90vw);
+  height: min(700px, 90vw);
+  background: radial-gradient(ellipse at center, rgba(74, 144, 217, 0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.products-section__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-2xl);
+}
+
+/* ---- Product Card ---- */
+.product-card {
+  padding: clamp(var(--space-xl), 3.5vw, var(--space-2xl));
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-slow);
+}
+
+.product-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--transition-slow);
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(74, 144, 217, 0.22);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+}
+
+.product-card:hover::before {
+  transform: scaleX(1);
+}
+
+.product-card--green::before {
+  background: linear-gradient(135deg, #4ADE80 0%, #86EFAC 100%);
+}
+
+.product-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.product-card__icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: rgba(74, 144, 217, 0.1);
+  border: 1px solid rgba(74, 144, 217, 0.15);
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.product-card--green .product-card__icon {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.18);
+}
+
+.product-card__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.product-card__tagline {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-light);
+  margin-top: 0.2rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.product-card--green .product-card__tagline {
+  color: #86EFAC;
+}
+
+.product-card__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin-bottom: var(--space-lg);
+}
+
+.product-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-lg);
+  flex: 1;
+}
+
+.product-card__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-snug);
+}
+
+.product-card__feature-check {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.product-card--green .product-card__feature-check {
+  color: #4ADE80;
+}
+
+/* ---- Status pill (active demo / expired) ---- */
+.product-card__status {
+  min-height: 1.5rem;
+  margin-bottom: var(--space-md);
+}
+
+.product-card__status:empty {
+  margin-bottom: 0;
+}
+
+.product-card__status-pill {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-full);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.product-card__status-pill--active {
+  background: rgba(74, 222, 128, 0.12);
+  color: #86EFAC;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.product-card__status-pill--expired {
+  background: rgba(248, 113, 113, 0.12);
+  color: #FCA5A5;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.product-card__actions {
+  margin-top: auto;
+}
+
+.product-card__cta {
+  width: 100%;
+  padding: 0.85rem;
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .products-section__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-card__header {
+    align-items: center;
+  }
+}

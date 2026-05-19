@@ -23,11 +23,12 @@ export function renderDemoRequestSection() {
     <section class="demo-section section" id="demo">
       <div class="container">
         <div class="section-header">
-          <span class="section-label">Try It Out</span>
-          <h2 class="section-title">Request a Demo</h2>
+          <span class="section-label">Probalo en vivo</span>
+          <h2 class="section-title">Agendá una demo personalizada</h2>
           <p class="section-subtitle">
-            See our solutions in action. Sign in to schedule a personalized 
-            demo with our team.
+            Para proyectos a medida, coordiná una llamada con el equipo.
+            Para Stock Manager o Medicus, activá la demo de 7 días desde
+            la sección de Productos.
           </p>
         </div>
 
@@ -35,13 +36,13 @@ export function renderDemoRequestSection() {
           <!-- Auth required prompt -->
           <div class="demo-section__auth-prompt glass-card" id="demo-auth-prompt">
             <div class="demo-section__auth-prompt-icon">🔐</div>
-            <h3 class="demo-section__auth-prompt-title">Sign in to Continue</h3>
+            <h3 class="demo-section__auth-prompt-title">Iniciá sesión para continuar</h3>
             <p class="demo-section__auth-prompt-text">
-              Create an account or sign in to request a personalized demo 
-              of our solutions. It only takes a moment.
+              Creá una cuenta o iniciá sesión para solicitar una demo
+              personalizada. Solo te lleva un momento.
             </p>
             <button class="button-primary" id="demo-sign-in-button">
-              Sign In to Request Demo
+              Iniciar sesión para solicitar demo
             </button>
           </div>
 
@@ -49,47 +50,49 @@ export function renderDemoRequestSection() {
           <div class="demo-section__form glass-card" id="demo-form-container" style="display: none;">
             <form id="demo-request-form" novalidate>
               <div class="form-group">
-                <label class="form-label" for="demo-solution-select">Solution Interest</label>
+                <label class="form-label" for="demo-solution-select">Tipo de solución</label>
                 <select class="input-field" id="demo-solution-select" name="solutionType">
-                  <option value="">Select a solution...</option>
-                  <option value="mobile-apps">Mobile Applications</option>
-                  <option value="web-platforms">Web Platforms</option>
-                  <option value="cloud-devops">Cloud & DevOps</option>
-                  <option value="custom-software">Custom Software</option>
+                  <option value="">Seleccioná una solución...</option>
+                  <option value="stock-manager">Stock Manager (producto)</option>
+                  <option value="medicus">Medicus (producto)</option>
+                  <option value="mobile-apps">Aplicaciones móviles</option>
+                  <option value="web-platforms">Plataformas web</option>
+                  <option value="cloud-devops">Cloud y DevOps</option>
+                  <option value="custom-software">Software a medida</option>
                 </select>
-                <span class="input-error-message">Please select a solution</span>
+                <span class="input-error-message">Seleccioná una solución</span>
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="demo-company-input">Company Name</label>
+                <label class="form-label" for="demo-company-input">Nombre de la empresa</label>
                 <input type="text" class="input-field" id="demo-company-input"
-                       name="companyName" placeholder="Your company name" maxlength="200" autocomplete="organization" />
-                <span class="input-error-message">Company name is required</span>
+                       name="companyName" placeholder="Nombre de tu empresa" maxlength="200" autocomplete="organization" />
+                <span class="input-error-message">El nombre de la empresa es obligatorio</span>
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="demo-date-input">Preferred Date</label>
+                <label class="form-label" for="demo-date-input">Fecha preferida</label>
                 <input type="date" class="input-field" id="demo-date-input"
                        name="preferredDate" />
-                <span class="input-error-message">Please select a date</span>
+                <span class="input-error-message">Seleccioná una fecha</span>
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="demo-message-input">Additional Details</label>
+                <label class="form-label" for="demo-message-input">Detalles adicionales</label>
                 <textarea class="input-field" id="demo-message-input"
-                          name="message" placeholder="Tell us about your project..." rows="3" maxlength="5000"></textarea>
+                          name="message" placeholder="Contanos sobre tu proyecto..." rows="3" maxlength="5000"></textarea>
               </div>
 
               <button type="submit" class="button-primary demo-section__form-submit" id="demo-submit-button">
-                Submit Request
+                Enviar solicitud
               </button>
             </form>
 
             <div class="demo-section__form-success" id="demo-form-success">
               <div class="demo-section__form-success-icon">🎉</div>
-              <h3 class="demo-section__form-success-title">Request Submitted!</h3>
+              <h3 class="demo-section__form-success-title">¡Solicitud enviada!</h3>
               <p class="demo-section__form-success-text">
-                We'll reach out to schedule your demo soon. Check your email for confirmation.
+                Nos vamos a contactar pronto para coordinar la demo. Revisá tu email para la confirmación.
               </p>
             </div>
           </div>
@@ -150,8 +153,8 @@ async function handleDemoSubmit(event) {
   const messageInput = document.getElementById('demo-message-input');
 
   const isValid = validateForm([
-    { element: solutionSelect, validator: isNotEmpty, message: 'Please select a solution' },
-    { element: companyInput, validator: isNotEmpty, message: 'Company name is required' },
+    { element: solutionSelect, validator: isNotEmpty, message: 'Seleccioná una solución' },
+    { element: companyInput, validator: isNotEmpty, message: 'El nombre de la empresa es obligatorio' },
   ]);
 
   if (!isValid) return;
@@ -160,7 +163,7 @@ async function handleDemoSubmit(event) {
   if (!user) return;
 
   submitBtn.disabled = true;
-  submitBtn.innerHTML = '<div class="spinner"></div> Submitting...';
+  submitBtn.innerHTML = '<div class="spinner"></div> Enviando...';
 
   try {
     const recaptchaToken = await executeRecaptcha(RecaptchaAction.DEMO_REQUEST);
@@ -179,11 +182,11 @@ async function handleDemoSubmit(event) {
     });
     form.style.display = 'none';
     document.getElementById('demo-form-success').classList.add('visible');
-    showToast('Demo request submitted successfully!', 'success');
+    showToast('Solicitud enviada con éxito.', 'success');
   } catch (error) {
     console.error('DemoRequestSection: Submission failed', error);
-    showToast('Failed to submit. Please try again.', 'error');
+    showToast('No pudimos enviar la solicitud. Probá de nuevo.', 'error');
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit Request';
+    submitBtn.textContent = 'Enviar solicitud';
   }
 }

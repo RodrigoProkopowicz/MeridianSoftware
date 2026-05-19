@@ -26,6 +26,7 @@
     "trailingSlash": false,
     "rewrites": [
       { "source": "/stock-manager/**", "destination": "/stock-manager/index.html" },
+      { "source": "/medicus/**", "destination": "/medicus/index.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

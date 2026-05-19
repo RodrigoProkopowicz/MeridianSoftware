@@ -17,9 +17,6 @@ export const RecaptchaAction = Object.freeze({
   /** User attempting to sign in with Google or Apple. */
   LOGIN: 'LOGIN',
 
-  /** User submitting the public contact form (anonymous). */
-  CONTACT_SUBMIT: 'CONTACT_SUBMIT',
-
   /** Authenticated user submitting a demo request. */
   DEMO_REQUEST: 'DEMO_REQUEST',
 });

@@ -34,28 +34,28 @@ export function renderAuthModal() {
     <div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" aria-hidden="true">
       <div class="auth-modal__backdrop" id="auth-modal-backdrop"></div>
       <div class="auth-modal__panel">
-        <button class="auth-modal__close" id="auth-modal-close" aria-label="Close">✕</button>
+        <button class="auth-modal__close" id="auth-modal-close" aria-label="Cerrar">✕</button>
 
         <img src="/logo.png" alt="Meridian Software" class="auth-modal__logo" decoding="async" loading="lazy" />
-        <h2 class="auth-modal__title" id="auth-modal-title">Welcome</h2>
-        <p class="auth-modal__subtitle">Sign in to access demos and personalized features</p>
+        <h2 class="auth-modal__title" id="auth-modal-title">Bienvenido</h2>
+        <p class="auth-modal__subtitle">Iniciá sesión para acceder a demos y funciones personalizadas</p>
 
         <div class="auth-modal__buttons">
           <button class="auth-button auth-button--google" id="auth-google-button" type="button">
             ${GOOGLE_ICON_SVG}
-            <span class="auth-button__label">Continue with Google</span>
+            <span class="auth-button__label">Continuar con Google</span>
           </button>
 
           <button class="auth-button auth-button--apple" id="auth-apple-button" type="button">
             ${APPLE_ICON_SVG}
-            <span class="auth-button__label">Continue with Apple</span>
+            <span class="auth-button__label">Continuar con Apple</span>
           </button>
         </div>
 
         <p class="auth-modal__terms">
-          By continuing, you agree to our
-          <a href="#">Terms of Service</a> and
-          <a href="#">Privacy Policy</a>.
+          Al continuar, aceptás nuestros
+          <a href="/terms" target="_blank" rel="noopener">Términos y Condiciones</a> y
+          <a href="/privacy" target="_blank" rel="noopener">Política de Privacidad</a>.
         </p>
       </div>
     </div>
@@ -126,11 +126,11 @@ async function runSignIn(button, signInFn, method) {
     const recaptchaToken = await recaptchaPromise;
     trackEvent(AnalyticsEvent.LOGIN, { method, recaptcha: recaptchaToken ? 'ok' : 'missing' });
     closeAuthModal();
-    showToast('Signed in successfully!', 'success');
+    showToast('¡Sesión iniciada!', 'success');
   } catch (error) {
     console.error(`AuthModal: ${method} sign-in failed`, error);
     if (error && error.code !== 'auth/popup-closed-by-user') {
-      showToast('Sign-in failed. Please try again.', 'error');
+      showToast('No pudimos iniciar sesión. Probá de nuevo.', 'error');
     }
   } finally {
     setAuthButtonLoading(button, false);

@@ -5,13 +5,16 @@
  * Submits to Firestore. No authentication required.
  */
 
-import { submitContactForm } from '../services/ContactFormService.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
-import { executeRecaptcha } from '../services/RecaptchaService.js';
-import { RecaptchaAction } from '../services/RecaptchaActions.js';
 import { validateForm, isNotEmpty, isValidEmail, hasMinLength } from '../utils/ValidationHelper.js';
-import { showToast } from '../utils/DomHelper.js';
+
+/**
+ * Inbox que recibe los mensajes del formulario de contacto. Si lo cambiás,
+ * acordate de actualizar también `functions/index.js` (donde se usa el
+ * mismo destinatario para futuros envíos server-side, si los reactivamos).
+ */
+const CONTACT_INBOX = '5w5t48t5n9@privaterelay.appleid.com';
 
 /**
  * Renders the contact section HTML.
@@ -24,34 +27,27 @@ export function renderContactSection() {
         <div class="contact-section__layout">
           <div class="contact-section__info reveal-left">
             <h2 class="contact-section__info-title">
-              Let's Build Something<br/>
-              <span style="color: var(--color-accent-light)">Remarkable Together</span>
+              Construyamos algo<br/>
+              <span style="color: var(--color-accent-light)">extraordinario juntos</span>
             </h2>
             <p class="contact-section__info-text">
-              Ready to start your project? Have questions about our services? 
-              We'd love to hear from you. Reach out and our team will get back 
-              to you within 24 hours.
+              ¿Listo para arrancar tu proyecto? ¿Tenés preguntas sobre nuestros servicios?
+              Contanos qué necesitás y nuestro equipo te responde
+              en menos de 24 horas.
             </p>
             <div class="contact-section__info-items">
               <div class="contact-section__info-item">
-                <div class="contact-section__info-item-icon">📧</div>
-                <div class="contact-section__info-item-content">
-                  <span class="contact-section__info-item-label">Email</span>
-                  <span class="contact-section__info-item-value">hello@meridiansoftware.dev</span>
-                </div>
-              </div>
-              <div class="contact-section__info-item">
                 <div class="contact-section__info-item-icon">📍</div>
                 <div class="contact-section__info-item-content">
-                  <span class="contact-section__info-item-label">Location</span>
+                  <span class="contact-section__info-item-label">Ubicación</span>
                   <span class="contact-section__info-item-value">Buenos Aires, Argentina</span>
                 </div>
               </div>
               <div class="contact-section__info-item">
                 <div class="contact-section__info-item-icon">⏰</div>
                 <div class="contact-section__info-item-content">
-                  <span class="contact-section__info-item-label">Response Time</span>
-                  <span class="contact-section__info-item-value">Within 24 hours</span>
+                  <span class="contact-section__info-item-label">Tiempo de respuesta</span>
+                  <span class="contact-section__info-item-value">Menos de 24 horas</span>
                 </div>
               </div>
             </div>
@@ -61,40 +57,34 @@ export function renderContactSection() {
             <form id="contact-form" novalidate>
               <div class="contact-section__form-row">
                 <div class="form-group">
-                  <label class="form-label" for="contact-name-input">Full Name</label>
+                  <label class="form-label" for="contact-name-input">Nombre completo</label>
                   <input type="text" class="input-field" id="contact-name-input"
-                         name="name" placeholder="John Doe" maxlength="200" autocomplete="name" />
-                  <span class="input-error-message">Name is required</span>
+                         name="name" placeholder="Juan Pérez" maxlength="200" autocomplete="name" />
+                  <span class="input-error-message">El nombre es obligatorio</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="contact-email-input">Email</label>
                   <input type="email" class="input-field" id="contact-email-input"
-                         name="email" placeholder="john@company.com" maxlength="200" autocomplete="email" />
-                  <span class="input-error-message">Valid email is required</span>
+                         name="email" placeholder="juan@empresa.com" maxlength="200" autocomplete="email" />
+                  <span class="input-error-message">Necesitamos un email válido</span>
                 </div>
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="contact-company-input">Company <span class="form-label__hint">(optional)</span></label>
+                <label class="form-label" for="contact-company-input">Empresa <span class="form-label__hint">(opcional)</span></label>
                 <input type="text" class="input-field" id="contact-company-input"
-                       name="company" placeholder="Your company" maxlength="200" autocomplete="organization" />
+                       name="company" placeholder="Tu empresa" maxlength="200" autocomplete="organization" />
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="contact-message-input">Message</label>
+                <label class="form-label" for="contact-message-input">Mensaje</label>
                 <textarea class="input-field" id="contact-message-input"
-                          name="message" placeholder="Tell us about your project..." rows="4" maxlength="5000"></textarea>
-                <span class="input-error-message">Message must be at least 10 characters</span>
-              </div>
-
-              <div class="honeypot" aria-hidden="true">
-                <label>Do not fill this field
-                  <input type="text" id="contact-website-input" name="website" tabindex="-1" autocomplete="off" />
-                </label>
+                          name="message" placeholder="Contanos sobre tu proyecto..." rows="4" maxlength="5000"></textarea>
+                <span class="input-error-message">El mensaje debe tener al menos 10 caracteres</span>
               </div>
 
               <button type="submit" class="button-primary contact-section__form-submit" id="contact-submit-button">
-                Send Message
+                Enviar mensaje
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2"/>
                 </svg>
@@ -102,10 +92,10 @@ export function renderContactSection() {
             </form>
 
             <div class="contact-section__form-success" id="contact-form-success">
-              <div class="contact-section__form-success-icon">✅</div>
-              <h3 class="contact-section__form-success-title">Message Sent!</h3>
+              <div class="contact-section__form-success-icon">✉️</div>
+              <h3 class="contact-section__form-success-title">Abrí tu app de email</h3>
               <p class="contact-section__form-success-text">
-                Thank you for reaching out. We'll get back to you shortly.
+                Te abrimos un mensaje con todo pre-cargado. Solo apretá <strong>Enviar</strong> en tu cliente de email para que nos llegue.
               </p>
             </div>
           </div>
@@ -125,81 +115,59 @@ export function initContactSection() {
   }
 }
 
-/** Minimum milliseconds a human needs to fill out the contact form. */
-const MIN_FILL_MS = 2500;
-/** Minimum seconds between submissions from the same browser (localStorage). */
-const SUBMIT_COOLDOWN_S = 60;
-/** localStorage key for last submission timestamp. */
-const LAST_SUBMIT_KEY = 'meridian.contact.lastSubmit';
-/** Timestamp when the form was first rendered (used for the "too fast" check). */
-const formLoadedAt = Date.now();
-
 /**
  * Handles contact form submission.
+ *
+ * No usamos backend: armamos un `mailto:` con asunto + cuerpo y lo abrimos
+ * en el cliente de email del usuario (Mail, Gmail, Outlook, etc.). El usuario
+ * solo aprieta "Enviar" en su app y el mensaje sale desde su propia cuenta —
+ * así nos llega con el remitente real, sin SMTP de por medio.
  * @param {Event} event
  */
-async function handleContactSubmit(event) {
+function handleContactSubmit(event) {
   event.preventDefault();
 
-  const nameInput = document.getElementById('contact-name-input');
-  const emailInput = document.getElementById('contact-email-input');
+  const nameInput    = document.getElementById('contact-name-input');
+  const emailInput   = document.getElementById('contact-email-input');
   const companyInput = document.getElementById('contact-company-input');
   const messageInput = document.getElementById('contact-message-input');
-  const honeypot = document.getElementById('contact-website-input');
-  const submitBtn = document.getElementById('contact-submit-button');
-
-  // Silent rejection — honeypot is hidden from real users; bots fill every field.
-  if (honeypot && honeypot.value) {
-    document.getElementById('contact-form').style.display = 'none';
-    document.getElementById('contact-form-success').classList.add('visible');
-    return;
-  }
-
-  // Too-fast check — humans take at least a couple of seconds to fill four fields.
-  if (Date.now() - formLoadedAt < MIN_FILL_MS) {
-    showToast('Please take a moment to review your message.', 'error');
-    return;
-  }
-
-  // Cooldown between submissions on the same browser.
-  const lastSubmit = Number(localStorage.getItem(LAST_SUBMIT_KEY)) || 0;
-  const secondsSince = (Date.now() - lastSubmit) / 1000;
-  if (secondsSince < SUBMIT_COOLDOWN_S) {
-    const wait = Math.ceil(SUBMIT_COOLDOWN_S - secondsSince);
-    showToast(`Please wait ${wait}s before sending another message.`, 'error');
-    return;
-  }
 
   const isValid = validateForm([
-    { element: nameInput, validator: isNotEmpty, message: 'Name is required' },
-    { element: emailInput, validator: isValidEmail, message: 'Valid email is required' },
-    { element: messageInput, validator: (v) => hasMinLength(v, 10), message: 'Message must be at least 10 characters' },
+    { element: nameInput,    validator: isNotEmpty,                        message: 'El nombre es obligatorio' },
+    { element: emailInput,   validator: isValidEmail,                      message: 'Necesitamos un email válido' },
+    { element: messageInput, validator: (v) => hasMinLength(v, 10),        message: 'El mensaje debe tener al menos 10 caracteres' },
   ]);
 
   if (!isValid) return;
 
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<div class="spinner"></div> Sending...';
+  const name    = nameInput.value.trim();
+  const email   = emailInput.value.trim();
+  const company = companyInput.value.trim();
+  const message = messageInput.value.trim();
 
-  try {
-    const recaptchaToken = await executeRecaptcha(RecaptchaAction.CONTACT_SUBMIT);
-    await submitContactForm({
-      name: nameInput.value.trim(),
-      email: emailInput.value.trim(),
-      company: companyInput.value.trim(),
-      message: messageInput.value.trim(),
-      recaptchaToken,
-    });
+  const subject = `Consulta desde meridian-software.com — ${name}`;
+  const body =
+    `${message}\n\n` +
+    `—\n` +
+    `Nombre: ${name}\n` +
+    `Email: ${email}\n` +
+    (company ? `Empresa: ${company}\n` : '');
 
-    localStorage.setItem(LAST_SUBMIT_KEY, String(Date.now()));
-    trackEvent(AnalyticsEvent.GENERATE_LEAD, { form: 'contact' });
-    document.getElementById('contact-form').style.display = 'none';
-    document.getElementById('contact-form-success').classList.add('visible');
-    showToast('Message sent successfully!', 'success');
-  } catch (error) {
-    console.error('ContactSection: Submission failed', error);
-    showToast('Failed to send message. Please try again.', 'error');
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = 'Send Message';
-  }
+  // RFC 6068: el subject y body van URL-encoded en un mailto:.
+  const mailtoUrl =
+    `mailto:${CONTACT_INBOX}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  trackEvent(AnalyticsEvent.GENERATE_LEAD, { form: 'contact' });
+
+  // Abrir el cliente de email. Algunos browsers bloquean window.open en
+  // contextos sin gesto; como esto sale de un click submit, location.href
+  // es la opción más confiable.
+  window.location.href = mailtoUrl;
+
+  // Mostrar el estado de éxito; el formulario queda oculto para indicar
+  // que el siguiente paso pasa por la app de email del usuario.
+  document.getElementById('contact-form').style.display = 'none';
+  document.getElementById('contact-form-success').classList.add('visible');
 }
