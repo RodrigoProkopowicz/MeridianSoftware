@@ -20,10 +20,10 @@ export function renderLeadsTab() {
     <div class="admin-tab admin-tab--leads">
       <div class="admin-tab__header">
         <h2 class="admin-tab__title">Leads</h2>
-        <button class="admin-button admin-button--sm" id="leads-refresh">Refresh</button>
+        <button class="admin-button admin-button--sm" id="leads-refresh">Actualizar</button>
       </div>
       <div class="admin-tab__body" id="leads-body">
-        <div class="admin-empty">Loading…</div>
+        <div class="admin-empty">Cargando…</div>
       </div>
     </div>
   `;
@@ -42,13 +42,13 @@ export function destroyLeadsTab() {
 async function loadLeads() {
   const body = document.getElementById('leads-body');
   if (!body) return;
-  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  body.innerHTML = '<div class="admin-empty">Cargando…</div>';
   try {
     leads = await listLeads();
     renderBody();
   } catch (err) {
     console.error('LeadsTab: load failed', err);
-    body.innerHTML = `<div class="admin-empty admin-empty--error">Failed to load leads: ${escapeHtml(err.message)}</div>`;
+    body.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar los leads: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -57,7 +57,7 @@ function renderBody() {
   if (!body) return;
 
   if (leads.length === 0) {
-    body.innerHTML = '<div class="admin-empty">No leads yet.</div>';
+    body.innerHTML = '<div class="admin-empty">Todavía no hay leads.</div>';
     return;
   }
 
@@ -66,11 +66,11 @@ function renderBody() {
       <table class="admin-table">
         <thead>
           <tr>
-            <th>Type</th>
-            <th>Date</th>
-            <th>Name / Company</th>
-            <th>Contact</th>
-            <th>Status</th>
+            <th>Tipo</th>
+            <th>Fecha</th>
+            <th>Nombre / Empresa</th>
+            <th>Contacto</th>
+            <th>Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -94,7 +94,7 @@ function renderBody() {
 }
 
 function rowHtml(lead) {
-  const type = lead._type === 'contact' ? 'Contact' : 'Demo';
+  const type = lead._type === 'contact' ? 'Contacto' : 'Demo';
   const date = formatTimestamp(lead.createdAt);
   const name = lead._type === 'contact'
     ? escapeHtml(lead.name || '—')
@@ -131,22 +131,22 @@ function renderDetail() {
   detail.innerHTML = `
     <div class="admin-detail__card">
       <div class="admin-detail__head">
-        <span class="admin-pill admin-pill--${lead._type}">${isContact ? 'Contact' : 'Demo'}</span>
+        <span class="admin-pill admin-pill--${lead._type}">${isContact ? 'Contacto' : 'Demo'}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(lead.createdAt))}</span>
       </div>
 
       <dl class="admin-detail__list">
         ${isContact ? `
-          <dt>Name</dt><dd>${escapeHtml(lead.name || '—')}</dd>
+          <dt>Nombre</dt><dd>${escapeHtml(lead.name || '—')}</dd>
           <dt>Email</dt><dd>${escapeHtml(lead.email || '—')}</dd>
-          <dt>Company</dt><dd>${escapeHtml(lead.company || '—')}</dd>
-          <dt>Message</dt><dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
+          <dt>Empresa</dt><dd>${escapeHtml(lead.company || '—')}</dd>
+          <dt>Mensaje</dt><dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
         ` : `
-          <dt>Company</dt><dd>${escapeHtml(lead.companyName || '—')}</dd>
-          <dt>Solution</dt><dd>${escapeHtml(lead.solutionType || '—')}</dd>
-          <dt>Preferred date</dt><dd>${escapeHtml(lead.preferredDate || '—')}</dd>
-          <dt>User ID</dt><dd><code>${escapeHtml(lead.userId || '—')}</code></dd>
-          <dt>Message</dt><dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
+          <dt>Empresa</dt><dd>${escapeHtml(lead.companyName || '—')}</dd>
+          <dt>Solución</dt><dd>${escapeHtml(lead.solutionType || '—')}</dd>
+          <dt>Fecha sugerida</dt><dd>${escapeHtml(lead.preferredDate || '—')}</dd>
+          <dt>UID</dt><dd><code>${escapeHtml(lead.userId || '—')}</code></dd>
+          <dt>Mensaje</dt><dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
         `}
         ${typeof lead.recaptchaScore === 'number'
           ? `<dt>reCAPTCHA</dt><dd>${lead.recaptchaScore.toFixed(2)}</dd>`
@@ -155,17 +155,17 @@ function renderDetail() {
 
       <div class="admin-detail__edit">
         <label class="admin-field">
-          <span class="admin-field__label">Status</span>
+          <span class="admin-field__label">Estado</span>
           <select class="admin-input" id="lead-status">
             ${statuses.map(s => `<option value="${s}"${s === lead.status ? ' selected' : ''}>${s}</option>`).join('')}
           </select>
         </label>
         <label class="admin-field">
-          <span class="admin-field__label">Notes (admin only)</span>
-          <textarea class="admin-input" id="lead-notes" rows="3" maxlength="2000">${escapeHtml(lead.adminNotes || '')}</textarea>
+          <span class="admin-field__label">Notas internas</span>
+          <textarea class="admin-input" id="lead-notes" rows="3" maxlength="2000" placeholder="Notas visibles solo para admins">${escapeHtml(lead.adminNotes || '')}</textarea>
         </label>
         <div class="admin-detail__actions">
-          <button class="admin-button admin-button--primary" id="lead-save">Save changes</button>
+          <button class="admin-button admin-button--primary" id="lead-save">Guardar cambios</button>
         </div>
       </div>
     </div>
@@ -184,10 +184,10 @@ async function saveLead(lead) {
     await updateLead(lead._type, lead.id, { status, adminNotes });
     Object.assign(lead, { status, adminNotes });
     renderBody();
-    showToast('Lead updated', 'success');
+    showToast('Lead actualizado', 'success');
   } catch (err) {
     console.error('LeadsTab: save failed', err);
-    showToast(`Save failed: ${err.message}`, 'error');
+    showToast(`No pudimos guardar: ${err.message}`, 'error');
     if (btn) btn.disabled = false;
   }
 }

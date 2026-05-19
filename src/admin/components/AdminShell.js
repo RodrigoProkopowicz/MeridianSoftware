@@ -12,7 +12,7 @@ import { renderUsersTab, initUsersTab, destroyUsersTab } from './UsersTab.js';
 
 const TABS = [
   { id: 'leads', label: 'Leads' },
-  { id: 'users', label: 'Users' },
+  { id: 'users', label: 'Usuarios' },
 ];
 
 let activeTab = 'leads';
@@ -27,10 +27,13 @@ export function renderAdminShell(user) {
   return `
     <div class="admin-shell">
       <header class="admin-shell__header">
-        <div class="admin-shell__brand">
+        <a class="admin-shell__brand" href="/" aria-label="Volver al sitio">
           <img src="/logo.png" alt="Meridian" class="admin-shell__logo" />
-          <span class="admin-shell__title">Admin</span>
-        </div>
+          <span class="admin-shell__brand-text">
+            <span class="admin-shell__brand-name">Meridian</span>
+            <span class="admin-shell__brand-tag">Admin</span>
+          </span>
+        </a>
         <nav class="admin-shell__tabs" role="tablist">
           ${TABS.map(t => `
             <button class="admin-shell__tab${t.id === activeTab ? ' is-active' : ''}"
@@ -44,7 +47,7 @@ export function renderAdminShell(user) {
           ${avatar}
           <span class="admin-shell__user-name">${name}</span>
           <button class="admin-button admin-button--ghost admin-button--sm" id="admin-signout">
-            Sign out
+            Cerrar sesión
           </button>
         </div>
       </header>

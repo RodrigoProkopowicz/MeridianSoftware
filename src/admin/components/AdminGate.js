@@ -16,6 +16,7 @@ import {
   signInWithApple,
   signOut,
   getCurrentUser,
+  isAuthResolved,
 } from '../../services/AuthenticationService.js';
 import { verifyAdmin } from '../services/AdminService.js';
 import { renderAdminShell, initAdminShell, destroyAdminShell } from './AdminShell.js';
@@ -28,20 +29,28 @@ export function renderAdminGate() {
 let lastState = null;
 
 export function initAdminGate() {
-  onAuthStateChange(async (user) => {
-    const root = document.getElementById('admin-gate');
-    if (!root) return;
+  const root = document.getElementById('admin-gate');
+  if (!root) return;
 
+  // Render a loading state synchronously so the user never sees the sign-in
+  // card while Firebase Auth is still restoring the persisted session. The
+  // sign-in card only appears after Firebase confirms there is no session.
+  renderLoading(root, 'Restaurando sesión…');
+  lastState = 'loading';
+
+  onAuthStateChange(async (user) => {
     if (!user) {
+      // If Firebase has not finished its first resolution yet, ignore the
+      // intermediate null — wait for the real result.
+      if (!isAuthResolved()) return;
       renderSignedOut(root);
       lastState = 'signed-out';
       destroyAdminShell();
       return;
     }
 
-    // Loading state while we check the claim.
     if (lastState !== 'admin') {
-      renderLoading(root);
+      renderLoading(root, 'Verificando acceso…');
     }
 
     try {
@@ -65,15 +74,18 @@ function renderSignedOut(root) {
   root.innerHTML = `
     <div class="admin-card admin-card--center">
       <img src="/logo.png" alt="Meridian" class="admin-card__logo" />
-      <h1 class="admin-card__title">Meridian Admin</h1>
-      <p class="admin-card__subtitle">Sign in with an admin-enabled account.</p>
+      <h1 class="admin-card__title">Panel admin</h1>
+      <p class="admin-card__subtitle">
+        Iniciá sesión con una cuenta autorizada para entrar al panel.
+      </p>
       <div class="admin-card__buttons">
         <button class="admin-button admin-button--google" id="admin-google-button" type="button">
-          Continue with Google
+          Continuar con Google
         </button>
         <button class="admin-button admin-button--apple" id="admin-apple-button" type="button">
-          Continue with Apple
+          Continuar con Apple
         </button>
+        <a class="admin-button admin-button--ghost" href="/">Volver al sitio</a>
       </div>
     </div>
   `;
@@ -86,40 +98,42 @@ function renderSignedOut(root) {
 async function runSignIn(button, signInFn) {
   button.disabled = true;
   const original = button.textContent;
-  button.textContent = 'Signing in…';
+  button.textContent = 'Iniciando sesión…';
   try {
     await signInFn();
   } catch (err) {
     console.error('AdminGate: sign-in failed', err);
     if (err && err.code !== 'auth/popup-closed-by-user') {
-      showToast('Sign-in failed. Try again.', 'error');
+      showToast('No pudimos iniciar sesión. Probá de nuevo.', 'error');
     }
     button.disabled = false;
     button.textContent = original;
   }
 }
 
-function renderLoading(root) {
+function renderLoading(root, label = 'Cargando…') {
   root.innerHTML = `
-    <div class="admin-card admin-card--center">
+    <div class="admin-card admin-card--center admin-card--loading">
+      <img src="/logo.png" alt="" class="admin-card__logo admin-card__logo--pulse" />
       <div class="admin-spinner"></div>
-      <p class="admin-card__subtitle">Verifying access…</p>
+      <p class="admin-card__subtitle">${escapeHtml(label)}</p>
     </div>
   `;
 }
 
 function renderForbidden(root, user) {
-  const email = escapeHtml(user.email || 'this account');
+  const email = escapeHtml(user.email || 'esta cuenta');
   root.innerHTML = `
     <div class="admin-card admin-card--center">
-      <h1 class="admin-card__title">Access denied</h1>
+      <div class="admin-card__icon admin-card__icon--warn" aria-hidden="true">⛔</div>
+      <h1 class="admin-card__title">Acceso denegado</h1>
       <p class="admin-card__subtitle">
-        ${email} doesn't have admin privileges. Ask an existing admin to grant
-        access from the panel, or run the bootstrap script.
+        ${email} no tiene permisos de administrador. Pedile a un admin
+        existente que te habilite desde el panel.
       </p>
       <div class="admin-card__buttons">
-        <button class="admin-button" id="admin-signout-forbidden" type="button">Sign out</button>
-        <a class="admin-button admin-button--ghost" href="/">Back to site</a>
+        <button class="admin-button" id="admin-signout-forbidden" type="button">Cerrar sesión</button>
+        <a class="admin-button admin-button--ghost" href="/">Volver al sitio</a>
       </div>
     </div>
   `;
@@ -130,10 +144,11 @@ function renderForbidden(root, user) {
 function renderError(root, err) {
   root.innerHTML = `
     <div class="admin-card admin-card--center">
-      <h1 class="admin-card__title">Something went wrong</h1>
-      <p class="admin-card__subtitle">${escapeHtml(err.message || 'Unknown error')}</p>
+      <div class="admin-card__icon admin-card__icon--error" aria-hidden="true">⚠️</div>
+      <h1 class="admin-card__title">Algo salió mal</h1>
+      <p class="admin-card__subtitle">${escapeHtml(err.message || 'Error desconocido')}</p>
       <div class="admin-card__buttons">
-        <button class="admin-button" id="admin-signout-error" type="button">Sign out</button>
+        <button class="admin-button" id="admin-signout-error" type="button">Cerrar sesión</button>
       </div>
     </div>
   `;

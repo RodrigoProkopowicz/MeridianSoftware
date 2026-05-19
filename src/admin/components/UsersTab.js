@@ -29,19 +29,19 @@ export function renderUsersTab() {
   return `
     <div class="admin-tab admin-tab--users">
       <div class="admin-tab__header">
-        <h2 class="admin-tab__title">Users</h2>
+        <h2 class="admin-tab__title">Usuarios</h2>
         <div class="admin-tab__controls">
           <input class="admin-input admin-input--search" id="users-search"
-                 type="search" placeholder="Search name or email…" autocomplete="off" />
-          <button class="admin-button admin-button--sm" id="users-refresh">Refresh</button>
+                 type="search" placeholder="Buscar por nombre o email…" autocomplete="off" />
+          <button class="admin-button admin-button--sm" id="users-refresh">Actualizar</button>
         </div>
       </div>
       <div class="admin-tab__body admin-tab__body--split">
         <div class="admin-users-list" id="users-list">
-          <div class="admin-empty">Loading…</div>
+          <div class="admin-empty">Cargando…</div>
         </div>
         <div class="admin-users-detail" id="users-detail">
-          <div class="admin-empty">Select a user to manage their demos and admin role.</div>
+          <div class="admin-empty">Seleccioná un usuario para gestionar sus demos y permisos.</div>
         </div>
       </div>
     </div>
@@ -72,14 +72,14 @@ export function destroyUsersTab() {
 async function loadUsers() {
   const list = document.getElementById('users-list');
   if (!list) return;
-  list.innerHTML = '<div class="admin-empty">Loading…</div>';
+  list.innerHTML = '<div class="admin-empty">Cargando…</div>';
   try {
     users = await listUsers();
     applyFilter();
     renderList();
   } catch (err) {
     console.error('UsersTab: load failed', err);
-    list.innerHTML = `<div class="admin-empty admin-empty--error">Failed to load users: ${escapeHtml(err.message)}</div>`;
+    list.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar los usuarios: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -99,7 +99,7 @@ function renderList() {
   if (!list) return;
 
   if (filteredUsers.length === 0) {
-    list.innerHTML = '<div class="admin-empty">No users found.</div>';
+    list.innerHTML = '<div class="admin-empty">No encontramos usuarios.</div>';
     return;
   }
 
@@ -138,13 +138,13 @@ async function selectUser(uid) {
   });
   const detail = document.getElementById('users-detail');
   if (!detail) return;
-  detail.innerHTML = '<div class="admin-empty">Loading user…</div>';
+  detail.innerHTML = '<div class="admin-empty">Cargando usuario…</div>';
   try {
     selectedDemos = await listDemoAccess(uid);
     renderDetail();
   } catch (err) {
     console.error('UsersTab: load demos failed', err);
-    detail.innerHTML = `<div class="admin-empty admin-empty--error">Failed to load demos: ${escapeHtml(err.message)}</div>`;
+    detail.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar las demos: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -163,29 +163,29 @@ function renderDetail() {
       <h3 class="admin-detail__title">${name}</h3>
       <dl class="admin-detail__list">
         <dt>Email</dt><dd>${email}</dd>
-        <dt>Provider</dt><dd>${escapeHtml(user.provider || '—')}</dd>
+        <dt>Proveedor</dt><dd>${escapeHtml(user.provider || '—')}</dd>
         <dt>UID</dt><dd><code>${escapeHtml(user.uid)}</code></dd>
-        <dt>Created</dt><dd>${escapeHtml(formatTimestamp(user.createdAt))}</dd>
-        <dt>Last login</dt><dd>${escapeHtml(formatTimestamp(user.lastLoginAt))}</dd>
+        <dt>Creado</dt><dd>${escapeHtml(formatTimestamp(user.createdAt))}</dd>
+        <dt>Último ingreso</dt><dd>${escapeHtml(formatTimestamp(user.lastLoginAt))}</dd>
       </dl>
 
-      <h4 class="admin-detail__subtitle">Demo access</h4>
+      <h4 class="admin-detail__subtitle">Acceso a demos</h4>
       <div class="admin-demos">
         ${DEMO_PRODUCTS.map(p => renderProductRow(p, findDemo(p.id))).join('')}
       </div>
 
-      <h4 class="admin-detail__subtitle">Admin role</h4>
+      <h4 class="admin-detail__subtitle">Permisos de admin</h4>
       <div class="admin-detail__actions">
-        <button class="admin-button admin-button--primary" id="user-make-admin"${isSelf ? ' disabled title="You cannot change your own role"' : ''}>
-          Grant admin
+        <button class="admin-button admin-button--primary" id="user-make-admin"${isSelf ? ' disabled title="No podés cambiar tu propio rol"' : ''}>
+          Otorgar admin
         </button>
-        <button class="admin-button admin-button--danger" id="user-revoke-admin"${isSelf ? ' disabled title="You cannot revoke your own role"' : ''}>
-          Revoke admin
+        <button class="admin-button admin-button--danger" id="user-revoke-admin"${isSelf ? ' disabled title="No podés revocar tu propio rol"' : ''}>
+          Revocar admin
         </button>
       </div>
       <p class="admin-detail__hint">
-        The target user must sign out and back in (or wait up to an hour) for
-        the new claim to be visible client-side.
+        El usuario tiene que cerrar sesión y volver a entrar (o esperar hasta
+        una hora) para que el nuevo permiso aparezca del lado del cliente.
       </p>
     </div>
   `;
@@ -204,10 +204,10 @@ function renderProductRow(product, demo) {
   const remaining = demo?.expiresAt ? remainingDays(demo.expiresAt) : null;
   const isExpired = remaining !== null && remaining < 0;
   const statusLabel = !demo
-    ? '<span class="admin-pill admin-pill--off">No access</span>'
+    ? '<span class="admin-pill admin-pill--off">Sin acceso</span>'
     : isExpired
-      ? '<span class="admin-pill admin-pill--expired">Expired</span>'
-      : '<span class="admin-pill admin-pill--active">Active</span>';
+      ? '<span class="admin-pill admin-pill--expired">Expirado</span>'
+      : '<span class="admin-pill admin-pill--active">Activo</span>';
 
   return `
     <div class="admin-demo-row" data-product="${escapeHtml(product.id)}">
@@ -217,20 +217,20 @@ function renderProductRow(product, demo) {
       </div>
       ${demo ? `
         <div class="admin-demo-row__meta">
-          Expires ${escapeHtml(expires)}${remaining !== null && !isExpired ? ` &middot; ${remaining}d left` : ''}
+          Vence ${escapeHtml(expires)}${remaining !== null && !isExpired ? ` &middot; ${remaining}d restantes` : ''}
         </div>
       ` : ''}
       <div class="admin-demo-row__actions">
         <label class="admin-field admin-field--inline">
-          <span class="admin-field__label">Days</span>
+          <span class="admin-field__label">Días</span>
           <input class="admin-input admin-input--num" type="number"
                  min="1" max="7" value="7" data-demo-days="${escapeHtml(product.id)}" />
         </label>
         ${demo ? `
-          <button class="admin-button admin-button--sm" data-demo-action="extend" data-product-id="${escapeHtml(product.id)}">Extend / reset</button>
-          <button class="admin-button admin-button--sm admin-button--danger" data-demo-action="revoke" data-product-id="${escapeHtml(product.id)}">Revoke</button>
+          <button class="admin-button admin-button--sm" data-demo-action="extend" data-product-id="${escapeHtml(product.id)}">Extender</button>
+          <button class="admin-button admin-button--sm admin-button--danger" data-demo-action="revoke" data-product-id="${escapeHtml(product.id)}">Revocar</button>
         ` : `
-          <button class="admin-button admin-button--sm admin-button--primary" data-demo-action="grant" data-product-id="${escapeHtml(product.id)}">Grant</button>
+          <button class="admin-button admin-button--sm admin-button--primary" data-demo-action="grant" data-product-id="${escapeHtml(product.id)}">Otorgar</button>
         `}
       </div>
     </div>
@@ -256,10 +256,10 @@ function attachDemoHandlers(productId) {
         else if (action === 'revoke') await revokeDemoAccess(selectedUid, productId);
         selectedDemos = await listDemoAccess(selectedUid);
         renderDetail();
-        showToast(`Demo ${action === 'revoke' ? 'revoked' : 'updated'}`, 'success');
+        showToast(`Demo ${action === 'revoke' ? 'revocada' : 'actualizada'}`, 'success');
       } catch (err) {
         console.error('UsersTab: demo action failed', err);
-        showToast(`Failed: ${err.message}`, 'error');
+        showToast(`No pudimos completar la acción: ${err.message}`, 'error');
         btn.disabled = false;
       }
     });
@@ -272,12 +272,12 @@ async function updateAdmin(user, makeAdmin) {
   if (btn) btn.disabled = true;
   try {
     await setAdminClaim(user.uid, makeAdmin);
-    showToast(makeAdmin ? 'Admin granted' : 'Admin revoked', 'success');
+    showToast(makeAdmin ? 'Admin otorgado' : 'Admin revocado', 'success');
   } catch (err) {
     console.error('UsersTab: setAdminClaim failed', err);
     const msg = err.code === 'functions/permission-denied'
-      ? 'You are not allowed to change admin roles.'
-      : err.message || 'Operation failed.';
+      ? 'No tenés permiso para cambiar roles de admin.'
+      : err.message || 'No pudimos completar la operación.';
     showToast(msg, 'error');
   } finally {
     if (btn) btn.disabled = false;
