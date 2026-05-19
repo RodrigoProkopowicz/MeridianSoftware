@@ -194,3 +194,36 @@
   background: rgba(74,144,217,0.1);
   color: var(--color-text-primary);
 }
+
+/* Anchor variant for "Panel admin" — same look as the button, no underline. */
+a.user-profile-badge__dropdown-item {
+  text-decoration: none;
+}
+
+.user-profile-badge__dropdown-item--admin {
+  color: var(--color-accent-light);
+  font-weight: var(--font-weight-medium);
+}
+
+.user-profile-badge__dropdown-item--admin:hover {
+  color: var(--color-accent-light);
+  background: rgba(74,144,217,0.18);
+}
+
+/* Small "Admin" pill next to the avatar so admins notice they're in admin mode. */
+.user-profile-badge__admin-pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-accent-light);
+  background: rgba(74, 144, 217, 0.18);
+  border-radius: var(--radius-full);
+  margin-left: var(--space-xs);
+}
+
+@media (max-width: 720px) {
+  .user-profile-badge__admin-pill { display: none; }
+}

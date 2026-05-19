@@ -32,9 +32,17 @@ export function initUserProfileBadge(openAuthModal) {
   const badge = document.getElementById('user-profile-badge');
   if (!badge) return;
 
-  onAuthStateChange(user => {
+  onAuthStateChange(async user => {
     if (user) {
-      renderLoggedInState(badge, user);
+      let isAdmin = false;
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        isAdmin = tokenResult.claims.admin === true;
+      } catch (err) {
+        // Token fetch failures shouldn't break the badge — fall back to non-admin.
+        console.warn('UserProfileBadge: failed to read admin claim', err);
+      }
+      renderLoggedInState(badge, user, { isAdmin });
     } else {
       renderLoggedOutState(badge, openAuthModal);
     }
@@ -45,8 +53,10 @@ export function initUserProfileBadge(openAuthModal) {
  * Renders the logged-in badge with avatar and dropdown.
  * @param {HTMLElement} container
  * @param {import('firebase/auth').User} user
+ * @param {{ isAdmin?: boolean }} [opts]
  */
-function renderLoggedInState(container, user) {
+function renderLoggedInState(container, user, opts = {}) {
+  const { isAdmin = false } = opts;
   const initial = escapeHtml((user.displayName || user.email || 'U')[0].toUpperCase());
   const avatarSrc = user.photoURL ? escapeHtml(user.photoURL) : '';
   const displayNameRaw = user.displayName || user.email || 'User';
@@ -59,12 +69,16 @@ function renderLoggedInState(container, user) {
       ? `<img class="user-profile-badge__avatar" src="${avatarSrc}" alt="${displayName}" />`
       : `<div class="user-profile-badge__avatar user-profile-badge__avatar--initial">${initial}</div>`
     }
+    ${isAdmin ? `<span class="user-profile-badge__admin-pill">Admin</span>` : ''}
     <span class="user-profile-badge__name hide-mobile">${firstName}</span>
     <div class="user-profile-badge__dropdown" id="profile-dropdown">
       <div class="user-profile-badge__dropdown-header">
         <div class="user-profile-badge__dropdown-name">${displayName}</div>
         <div class="user-profile-badge__dropdown-email">${email}</div>
       </div>
+      ${isAdmin
+        ? `<a class="user-profile-badge__dropdown-item user-profile-badge__dropdown-item--admin" href="/admin">Panel admin</a>`
+        : ''}
       <button class="user-profile-badge__dropdown-item" id="sign-out-button">Cerrar sesión</button>
     </div>
   `;
