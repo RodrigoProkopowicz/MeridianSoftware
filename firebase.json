@@ -26,6 +26,8 @@
     "trailingSlash": false,
     "rewrites": [
       { "source": "/stock-manager/**", "destination": "/stock-manager/index.html" },
+      { "source": "/admin", "destination": "/admin.html" },
+      { "source": "/admin/**", "destination": "/admin.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
@@ -39,6 +41,13 @@
         "source": "index.html",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "admin.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+          { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
         ]
       }
     ]

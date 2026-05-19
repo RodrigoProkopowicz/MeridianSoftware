@@ -14,8 +14,10 @@
  */
 
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
 initializeApp();
@@ -129,3 +131,43 @@ exports.validateDemoRecaptcha = onDocumentCreated(
     }
   }
 );
+
+/**
+ * setAdminClaim — callable that grants or revokes the `admin` custom claim
+ * on a target user. Only existing admins may call it.
+ *
+ * The very first admin is bootstrapped out-of-band via
+ * `functions/scripts/grant-first-admin.mjs` (Admin SDK has no claim check).
+ *
+ * Input:  { uid: string, admin: boolean }
+ * Output: { uid, admin }
+ */
+exports.setAdminClaim = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Admin privileges required.');
+  }
+
+  const { uid, admin } = request.data || {};
+  if (typeof uid !== 'string' || uid.length === 0) {
+    throw new HttpsError('invalid-argument', '`uid` must be a non-empty string.');
+  }
+  if (typeof admin !== 'boolean') {
+    throw new HttpsError('invalid-argument', '`admin` must be a boolean.');
+  }
+
+  // Block self-demotion so the panel can't lock every admin out by accident.
+  if (uid === request.auth.uid && admin === false) {
+    throw new HttpsError('failed-precondition', 'You cannot revoke your own admin access.');
+  }
+
+  const auth = getAuth();
+  const target = await auth.getUser(uid);
+  const nextClaims = { ...(target.customClaims || {}), admin };
+  if (!admin) delete nextClaims.admin;
+  await auth.setCustomUserClaims(uid, nextClaims);
+
+  return { uid, admin };
+});
