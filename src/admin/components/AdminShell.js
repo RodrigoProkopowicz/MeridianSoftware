@@ -39,7 +39,7 @@ export function renderAdminShell(user) {
     <div class="admin-app">
       <aside class="admin-sidebar">
         <a class="admin-sidebar__brand" href="/" aria-label="Volver al sitio">
-          <img src="/logo.png" alt="" class="admin-sidebar__logo" />
+          <img src="/icon-192.png" alt="" class="admin-sidebar__logo" />
           <span class="admin-sidebar__brand-text">
             <span class="admin-sidebar__brand-name">Meridian</span>
             <span class="admin-sidebar__brand-tag">Admin</span>

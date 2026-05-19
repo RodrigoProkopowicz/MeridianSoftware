@@ -79,7 +79,7 @@ function authShell({ rightHtml }) {
     <div class="admin-auth">
       <aside class="admin-auth__brand">
         <a class="admin-auth__brand-head" href="/" aria-label="Volver al sitio">
-          <img src="/logo.png" alt="" class="admin-auth__brand-mark" />
+          <img src="/icon-192.png" alt="" class="admin-auth__brand-mark" />
           <span class="admin-auth__brand-name">Meridian</span>
         </a>
         <div class="admin-auth__brand-body">
