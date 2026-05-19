@@ -35,18 +35,26 @@ service cloud.firestore {
       return field is string && field.size() > 0 && field.size() <= maxLen;
     }
 
-    // Super-admin global. Source of truth: users/{uid}.role == 'admin'.
-    // Se setea manualmente desde Firebase Console — la app no expone toggle.
+    // Super-admin global. Aceptamos dos fuentes de verdad mientras se unifica
+    // el modelo:
+    //   1. Custom claim `auth.token.admin == true` (seteado por la callable
+    //      `setAdminClaim` o por el script grant-first-admin.mjs).
+    //   2. Firestore `users/{uid}.role == 'admin'` (seteado por
+    //      functions/scripts/set-admin-role.mjs).
+    // El custom claim se chequea primero — es gratis. El get() solo corre si
+    // el claim no está, lo que mantiene el costo razonable.
     function isAdmin() {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && (request.auth.token.admin == true
+            || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     // ---- users/{uid} ----
-    // Profile is created and maintained by AuthenticationService.createOrUpdateUserProfile
+    // Profile is created and maintained by AuthenticationService.createOrUpdateUserProfile.
+    // Admins can read/list all profiles for the admin panel.
     match /users/{uid} {
-      allow read:   if isOwner(uid) || isAdmin();
+      allow read, list: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid)
                        && hasOnlyFields(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
                        && payloadSizeOK();
@@ -62,10 +70,11 @@ service cloud.firestore {
 
       // ---- users/{uid}/demoAccess/{productId} ----
       // Self-service 7-day demo grant for in-house products (stock-manager, medicus).
-      // Doc se crea cuando el usuario activa la demo desde meridian-software.com
-      // (capped a 7 días). El admin puede crear/extender/revocar sin cap.
+      // El usuario lo crea desde meridian-software.com (capped a 7 días). El
+      // admin lo extiende / revoca sin cap desde el panel /admin.
       match /demoAccess/{productId} {
         allow read:   if isOwner(uid) || isAdmin();
+        allow list:   if isOwner(uid) || isAdmin();
         allow create: if (isOwner(uid)
                            && (productId == 'stock-manager' || productId == 'medicus')
                            && request.resource.data.keys().hasOnly(['productId','grantedAt','expiresAt','status'])
@@ -81,10 +90,10 @@ service cloud.firestore {
     }
 
     // ---- demoRequests/{id} ----
-    // Any signed-in user can create a request for themselves; not readable/editable from the client.
-    // Admin access is handled server-side (Firebase Console or Admin SDK).
+    // Any signed-in user can create a request for themselves. Admins read/list
+    // and may update the status field (e.g. mark contacted) from the panel.
     match /demoRequests/{id} {
-      allow read:   if false;
+      allow read, list: if isAdmin();
       allow create: if isSignedIn()
                        && request.resource.data.userId == request.auth.uid
                        && hasOnlyFields(['userId','solutionType','companyName','message','preferredDate','status','recaptchaToken','createdAt'])
@@ -92,14 +101,18 @@ service cloud.firestore {
                        && isNonEmptyString(request.resource.data.companyName, 200)
                        && request.resource.data.status == 'pending'
                        && payloadSizeOK();
-      allow update, delete: if false;
+      allow update: if isAdmin()
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','adminNotes']);
+      allow delete: if false;
     }
 
     // ---- contactSubmissions/{id} ----
     // El formulario de contacto pasó a usar mailto: del lado del cliente.
-    // Ya no recibimos submissions acá — bloqueamos todo.
+    // Ya no recibimos submissions nuevas; el admin puede leer el historial
+    // que quedó, pero create/update/delete siguen cerrados.
     match /contactSubmissions/{id} {
-      allow read, write: if false;
+      allow read, list: if isAdmin();
+      allow write:      if false;
     }
 
     // ============================================================
