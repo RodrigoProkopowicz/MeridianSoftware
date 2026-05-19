@@ -14,7 +14,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/FirebaseConfig.js';
+import { auth, db, appCheckReady } from '../config/FirebaseConfig.js';
 
 const googleProvider = new GoogleAuthProvider();
 const appleProvider = new OAuthProvider('apple.com');
@@ -110,6 +110,12 @@ export function getCurrentUser() {
  * @param {import('firebase/auth').User} user
  */
 async function createOrUpdateUserProfile(user) {
+  // Wait for App Check before the first Firestore round-trip. Session
+  // restoration can fire this in milliseconds — earlier than the deferred
+  // App Check init — and a write without a token gets rejected when
+  // enforcement is on.
+  await appCheckReady;
+
   const userRef = doc(db, 'users', user.uid);
 
   try {

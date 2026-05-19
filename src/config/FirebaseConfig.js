@@ -48,8 +48,24 @@ const firebaseApp = initializeApp(firebaseConfig);
 
 // ---- App Check (deferred) ----
 // Dynamic import keeps the firebase/app-check SDK out of the main bundle.
-// Runs on idle so it doesn't contend with first paint.
+// We schedule init off the critical path AND expose `appCheckReady` so any
+// Firestore write that can fire before first paint (e.g. the profile write
+// inside onAuthStateChanged when a session is restored from localStorage)
+// can await it — without that, a write could race past init and reach
+// Firestore without an App Check token.
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+let resolveAppCheckReady;
+/**
+ * Resolves once App Check finishes initializing — or to `null` if init
+ * failed or no reCAPTCHA key is configured. Await this before any write
+ * that may run before first paint.
+ * @type {Promise<import('firebase/app-check').AppCheck | null>}
+ */
+export const appCheckReady = recaptchaSiteKey
+  ? new Promise(resolve => { resolveAppCheckReady = resolve; })
+  : Promise.resolve(null);
+
 if (recaptchaSiteKey) {
   if (import.meta.env.DEV) {
     // @ts-ignore - Firebase reads this global flag.
@@ -58,17 +74,27 @@ if (recaptchaSiteKey) {
   const initAppCheck = () =>
     import('firebase/app-check')
       .then(({ initializeAppCheck, ReCaptchaEnterpriseProvider }) => {
-        initializeAppCheck(firebaseApp, {
+        const appCheck = initializeAppCheck(firebaseApp, {
           provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
           isTokenAutoRefreshEnabled: true,
         });
+        resolveAppCheckReady(appCheck);
       })
-      .catch(err => console.warn('FirebaseConfig: App Check init failed —', err.message));
+      .catch(err => {
+        console.warn('FirebaseConfig: App Check init failed —', err.message);
+        resolveAppCheckReady(null);
+      });
 
+  // Prefer `requestIdleCallback` when available. Otherwise (older Safari)
+  // wait for `load` — that's the first moment guaranteed to be past first
+  // paint in every browser. The previous `setTimeout(initAppCheck, 500)`
+  // was an arbitrary delay any consumer could race past.
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(initAppCheck, { timeout: 2000 });
+  } else if (document.readyState === 'complete') {
+    setTimeout(initAppCheck, 0);
   } else {
-    setTimeout(initAppCheck, 500);
+    window.addEventListener('load', () => setTimeout(initAppCheck, 0), { once: true });
   }
 }
 

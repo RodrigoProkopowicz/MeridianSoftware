@@ -34,7 +34,16 @@ export const DEMO_PRODUCTS = [
 ];
 
 const DEFAULT_DEMO_DAYS = 7;
-const MAX_DEMO_DAYS = 7; // Rules cap expiresAt at now + 7d + 5min.
+/**
+ * Client-side cap for admin grants. Firestore rules do NOT enforce this for
+ * admins — `allow update/delete: if isAdmin();` is unrestricted, and the
+ * `withinSelfServiceCap` helper in firestore.rules only gates owner-side
+ * create. We clamp here so the panel UI stays bounded and matches the
+ * `max="7"` attribute on the days input in UsersTab.js. To let admins grant
+ * longer demos (30 / 90 / 365 days), bump this AND the input's `max` — the
+ * Firestore rule does not need to change.
+ */
+const MAX_DEMO_DAYS = 7;
 
 /**
  * Verifies the signed-in user has the `admin` custom claim. Returns the

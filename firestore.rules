@@ -70,9 +70,20 @@ service cloud.firestore {
 
       // ---- users/{uid}/demoAccess/{productId} ----
       // Self-service 7-day demo grant for in-house products (stock-manager, medicus).
-      // El usuario lo crea desde meridian-software.com (capped a 7 días). El
-      // admin lo extiende / revoca sin cap desde el panel /admin.
+      // El usuario lo crea desde meridian-software.com (capped a 7 días).
+      // El admin lo extiende / revoca sin cap desde el panel /admin
+      // (`allow update/delete: if isAdmin();` no pasa por withinSelfServiceCap).
       match /demoAccess/{productId} {
+        // Self-service cap: 7 días + 5 min de tolerancia para clock skew.
+        // Está acoplado con DEMO_DURATION_MS en src/services/DemoAccessService.js
+        // — si extendés el plazo del flujo self-service, movelo en ambos lados.
+        // No afecta al panel admin (UsersTab.js tiene su propio cap de UI).
+        function withinSelfServiceCap(expiresAt) {
+          let maxMs = request.time.toMillis() + (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 1000);
+          return expiresAt.toMillis() <= maxMs
+              && expiresAt.toMillis() >= request.time.toMillis();
+        }
+
         allow read:   if isOwner(uid) || isAdmin();
         allow list:   if isOwner(uid) || isAdmin();
         allow create: if (isOwner(uid)
@@ -81,8 +92,7 @@ service cloud.firestore {
                            && request.resource.data.productId == productId
                            && request.resource.data.status == 'active'
                            && request.resource.data.expiresAt is timestamp
-                           && request.resource.data.expiresAt.toMillis() <= request.time.toMillis() + (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 1000)
-                           && request.resource.data.expiresAt.toMillis() >= request.time.toMillis())
+                           && withinSelfServiceCap(request.resource.data.expiresAt))
                         || isAdmin();
         allow update: if isAdmin();
         allow delete: if isAdmin();

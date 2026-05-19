@@ -17,7 +17,15 @@
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../config/FirebaseConfig.js';
 
-/** Duration of the demo trial in milliseconds. */
+/**
+ * Duration of the self-service demo trial in milliseconds.
+ *
+ * Coupled with `withinSelfServiceCap` in firestore.rules — that rule caps
+ * owner-side writes at `request.time + 7d + 5min` (the 5 min is clock-skew
+ * tolerance). If you change this value, change the `7 * 24 * 60 * 60 * 1000`
+ * in the rule too. The admin panel uses its own UI cap and is NOT bound by
+ * this rule (see AdminService.MAX_DEMO_DAYS).
+ */
 const DEMO_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Allowed product IDs — must match Firestore rules. */
