@@ -1,7 +1,7 @@
 /**
  * UsersTab.js
  *
- * Searchable users list. Selecting a user opens a detail card that exposes:
+ * Searchable users list. Selecting a user opens a detail panel that exposes:
  *   - Demo access management (grant / extend / revoke) for each product
  *   - Promote / demote admin via the setAdminClaim callable
  */
@@ -18,6 +18,7 @@ import {
 import { getCurrentUser } from '../../services/AuthenticationService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp, formatRelative } from '../utils/Format.js';
+import { renderTopbarActions, setTopbarMeta } from './AdminShell.js';
 
 let users = [];
 let filteredUsers = [];
@@ -27,37 +28,36 @@ let selectedDemos = [];
 
 export function renderUsersTab() {
   return `
-    <div class="admin-tab admin-tab--users">
-      <div class="admin-tab__header">
-        <h2 class="admin-tab__title">Usuarios</h2>
-        <div class="admin-tab__controls">
-          <input class="admin-input admin-input--search" id="users-search"
-                 type="search" placeholder="Buscar por nombre o email…" autocomplete="off" />
-          <button class="admin-button admin-button--sm" id="users-refresh">Actualizar</button>
-        </div>
+    <div class="admin-split">
+      <div class="admin-panel admin-panel--scroll" id="users-list">
+        <div class="admin-empty">Cargando…</div>
       </div>
-      <div class="admin-tab__body admin-tab__body--split">
-        <div class="admin-users-list" id="users-list">
-          <div class="admin-empty">Cargando…</div>
-        </div>
-        <div class="admin-users-detail" id="users-detail">
-          <div class="admin-empty">Seleccioná un usuario para gestionar sus demos y permisos.</div>
-        </div>
+      <div id="users-detail">
+        ${detailPlaceholder()}
       </div>
     </div>
   `;
 }
 
 export function initUsersTab() {
-  document.getElementById('users-refresh')?.addEventListener('click', loadUsers);
-  const search = document.getElementById('users-search');
-  if (search) {
-    search.addEventListener('input', (e) => {
-      searchTerm = e.target.value.trim().toLowerCase();
-      applyFilter();
-      renderList();
-    });
-  }
+  renderTopbarActions((slot) => {
+    slot.innerHTML = `
+      <input class="admin-input admin-input--search" id="users-search"
+             type="search" placeholder="Buscar por nombre o email…" autocomplete="off" />
+      <button class="admin-button" id="users-refresh" type="button">Actualizar</button>
+    `;
+    const search = slot.querySelector('#users-search');
+    if (search) {
+      search.value = searchTerm;
+      search.addEventListener('input', (e) => {
+        searchTerm = e.target.value.trim().toLowerCase();
+        applyFilter();
+        renderList();
+        setTopbarMeta(metaText());
+      });
+    }
+    slot.querySelector('#users-refresh')?.addEventListener('click', loadUsers);
+  });
   loadUsers();
 }
 
@@ -67,6 +67,7 @@ export function destroyUsersTab() {
   searchTerm = '';
   selectedUid = null;
   selectedDemos = [];
+  setTopbarMeta('');
 }
 
 async function loadUsers() {
@@ -77,10 +78,20 @@ async function loadUsers() {
     users = await listUsers();
     applyFilter();
     renderList();
+    setTopbarMeta(metaText());
   } catch (err) {
     console.error('UsersTab: load failed', err);
     list.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar los usuarios: ${escapeHtml(err.message)}</div>`;
+    setTopbarMeta('');
   }
+}
+
+function metaText() {
+  const total = users.length;
+  const shown = filteredUsers.length;
+  if (!total) return '';
+  if (searchTerm) return `${shown} de ${total}`;
+  return `${total} ${total === 1 ? 'usuario' : 'usuarios'}`;
 }
 
 function applyFilter() {
@@ -110,7 +121,7 @@ function renderList() {
 }
 
 function userRowHtml(u) {
-  const name = escapeHtml(u.displayName || u.email || 'User');
+  const name = escapeHtml(u.displayName || u.email || 'Usuario');
   const email = escapeHtml(u.email || '');
   const last = u.lastLoginAt ? formatRelative(u.lastLoginAt) : '—';
   const initial = escapeHtml((u.displayName || u.email || 'U')[0].toUpperCase());
@@ -138,14 +149,36 @@ async function selectUser(uid) {
   });
   const detail = document.getElementById('users-detail');
   if (!detail) return;
-  detail.innerHTML = '<div class="admin-empty">Cargando usuario…</div>';
+  detail.innerHTML = `
+    <div class="admin-detail">
+      <div class="admin-detail__placeholder">
+        <span class="admin-spinner admin-spinner--lg"></span>
+        <div style="margin-top: 0.5rem;">Cargando usuario…</div>
+      </div>
+    </div>
+  `;
   try {
     selectedDemos = await listDemoAccess(uid);
     renderDetail();
   } catch (err) {
     console.error('UsersTab: load demos failed', err);
-    detail.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar las demos: ${escapeHtml(err.message)}</div>`;
+    detail.innerHTML = `<div class="admin-detail"><div class="admin-empty admin-empty--error">No pudimos cargar las demos: ${escapeHtml(err.message)}</div></div>`;
   }
+}
+
+function detailPlaceholder() {
+  return `
+    <div class="admin-detail">
+      <div class="admin-detail__placeholder">
+        <svg class="admin-detail__placeholder-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.5"/>
+          <path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+        </svg>
+        Seleccioná un usuario para gestionar
+        sus accesos y permisos.
+      </div>
+    </div>
+  `;
 }
 
 function renderDetail() {
@@ -155,17 +188,19 @@ function renderDetail() {
   if (!user) return;
 
   const isSelf = getCurrentUser()?.uid === user.uid;
-  const name = escapeHtml(user.displayName || user.email || 'User');
+  const name = escapeHtml(user.displayName || user.email || 'Usuario');
   const email = escapeHtml(user.email || '—');
 
   detail.innerHTML = `
-    <div class="admin-detail__card">
-      <h3 class="admin-detail__title">${name}</h3>
+    <div class="admin-detail">
+      <div class="admin-detail__head">
+        <span class="admin-detail__title">${name}</span>
+        <span class="admin-detail__date">${escapeHtml(formatTimestamp(user.createdAt))}</span>
+      </div>
       <dl class="admin-detail__list">
         <dt>Email</dt><dd>${email}</dd>
         <dt>Proveedor</dt><dd>${escapeHtml(user.provider || '—')}</dd>
         <dt>UID</dt><dd><code>${escapeHtml(user.uid)}</code></dd>
-        <dt>Creado</dt><dd>${escapeHtml(formatTimestamp(user.createdAt))}</dd>
         <dt>Último ingreso</dt><dd>${escapeHtml(formatTimestamp(user.lastLoginAt))}</dd>
       </dl>
 
@@ -227,10 +262,10 @@ function renderProductRow(product, demo) {
                  min="1" max="7" value="7" data-demo-days="${escapeHtml(product.id)}" />
         </label>
         ${demo ? `
-          <button class="admin-button admin-button--sm" data-demo-action="extend" data-product-id="${escapeHtml(product.id)}">Extender</button>
-          <button class="admin-button admin-button--sm admin-button--danger" data-demo-action="revoke" data-product-id="${escapeHtml(product.id)}">Revocar</button>
+          <button class="admin-button" data-demo-action="extend" data-product-id="${escapeHtml(product.id)}">Extender</button>
+          <button class="admin-button admin-button--danger" data-demo-action="revoke" data-product-id="${escapeHtml(product.id)}">Revocar</button>
         ` : `
-          <button class="admin-button admin-button--sm admin-button--primary" data-demo-action="grant" data-product-id="${escapeHtml(product.id)}">Otorgar</button>
+          <button class="admin-button admin-button--primary" data-demo-action="grant" data-product-id="${escapeHtml(product.id)}">Otorgar</button>
         `}
       </div>
     </div>
