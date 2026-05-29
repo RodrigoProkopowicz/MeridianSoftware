@@ -44,7 +44,7 @@ const COLLECTION = 'promotionalSubscriptions';
 // createPromotionalPreapproval — requiere sesión (cuenta compartida con el sitio)
 // ============================================================
 exports.createPromotionalPreapproval = onCall(
-  { secrets: [mpAccessToken] },
+  { secrets: [mpAccessToken], enforceAppCheck: true },
   async (request) => {
     // El formulario está gateado tras el login: exigimos sesión para crear la
     // suscripción y la atamos a la cuenta del usuario (la misma del sitio principal).
@@ -142,16 +142,42 @@ exports.mercadoPagoWebhook = onRequest(
         return;
       }
 
-      const token = mpAccessToken.value();
-      if (note.kind === 'preapproval') {
-        const pre = await getPreapproval(token, note.id);
-        await applyPreapprovalUpdate(pre);
-      } else if (note.kind === 'authorized_payment') {
-        const pay = await getAuthorizedPayment(token, note.id);
-        await applyAuthorizedPayment(pay);
+      // Idempotencia: no reprocesamos la misma entrega. MP manda un x-request-id
+      // único por entrega (los reintentos reusan el mismo). Si falta, usamos
+      // kind:id:ts — incluimos el ts para NO descartar cambios de estado
+      // posteriores de la misma preapproval (pending → authorized).
+      const db = getFirestore();
+      const requestId = req.get('x-request-id') || '';
+      const ts = parseSignatureTs(req.get('x-signature') || '');
+      const eventKey = requestId ? `req:${requestId}` : `${note.kind}:${note.id}:${ts || 'no-ts'}`;
+      const eventRef = db.collection('promoWebhookEvents').doc(eventKey);
+      if ((await eventRef.get()).exists) {
+        res.status(200).send('duplicate');
+        return;
       }
+      await eventRef.set({
+        kind: note.kind,
+        dataId: note.id,
+        requestId: requestId || null,
+        ts: ts || null,
+        receivedAt: FieldValue.serverTimestamp(),
+      });
 
-      res.status(200).send('ok');
+      try {
+        const token = mpAccessToken.value();
+        if (note.kind === 'preapproval') {
+          const pre = await getPreapproval(token, note.id);
+          await applyPreapprovalUpdate(pre);
+        } else if (note.kind === 'authorized_payment') {
+          const pay = await getAuthorizedPayment(token, note.id);
+          await applyAuthorizedPayment(pay);
+        }
+        res.status(200).send('ok');
+      } catch (err) {
+        // Liberamos el registro para que MP pueda reintentar la entrega.
+        await eventRef.delete().catch(() => {});
+        throw err;
+      }
     } catch (err) {
       logger.error('mercadoPagoWebhook: error', err.mpBody || err.message);
       // 5xx hace que MP reintente — adecuado para errores transitorios.
@@ -164,7 +190,7 @@ exports.mercadoPagoWebhook = onRequest(
 // cancelPromotionalSubscription — callable admin
 // ============================================================
 exports.cancelPromotionalSubscription = onCall(
-  { secrets: [mpAccessToken] },
+  { secrets: [mpAccessToken], enforceAppCheck: true },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -213,7 +239,7 @@ exports.cancelPromotionalSubscription = onCall(
  * cliente tenga que re-autorizar.
  */
 exports.updatePromotionalAmount = onCall(
-  { secrets: [mpAccessToken] },
+  { secrets: [mpAccessToken], enforceAppCheck: true },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -376,6 +402,15 @@ function verifySignature(req) {
   } catch (_) {
     return false;
   }
+}
+
+/** Extrae el `ts` del header x-signature de MP (para la clave de idempotencia). */
+function parseSignatureTs(signatureHeader) {
+  if (!signatureHeader) return null;
+  const parts = Object.fromEntries(
+    signatureHeader.split(',').map(p => p.trim().split('=').map(s => s.trim()))
+  );
+  return parts.ts || null;
 }
 
 /** Estados de preapproval de MP que persistimos tal cual. */
