@@ -13,6 +13,7 @@ import {
   extendDemoAccess,
   revokeDemoAccess,
   setAdminClaim,
+  deleteUser,
   DEMO_PRODUCTS,
 } from '../services/AdminService.js';
 import { getCurrentUser } from '../../services/AuthenticationService.js';
@@ -188,13 +189,14 @@ function renderDetail() {
   if (!user) return;
 
   const isSelf = getCurrentUser()?.uid === user.uid;
+  const isAdmin = user.admin === true;
   const name = escapeHtml(user.displayName || user.email || 'Usuario');
   const email = escapeHtml(user.email || '—');
 
   detail.innerHTML = `
     <div class="admin-detail">
       <div class="admin-detail__head">
-        <span class="admin-detail__title">${name}</span>
+        <span class="admin-detail__title">${name}${isAdmin ? ' <span class="admin-pill admin-pill--active">Admin</span>' : ''}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(user.createdAt))}</span>
       </div>
       <dl class="admin-detail__list">
@@ -211,23 +213,30 @@ function renderDetail() {
 
       <h4 class="admin-detail__subtitle">Permisos de admin</h4>
       <div class="admin-detail__actions">
-        <button class="admin-button admin-button--primary" id="user-make-admin"${isSelf ? ' disabled title="No podés cambiar tu propio rol"' : ''}>
-          Otorgar admin
-        </button>
-        <button class="admin-button admin-button--danger" id="user-revoke-admin"${isSelf ? ' disabled title="No podés revocar tu propio rol"' : ''}>
-          Revocar admin
-        </button>
+        ${isAdmin
+          ? `<button class="admin-button admin-button--danger" id="user-toggle-admin"${isSelf ? ' disabled title="No podés cambiar tu propio rol"' : ''}>Revocar admin</button>`
+          : `<button class="admin-button admin-button--primary" id="user-toggle-admin"${isSelf ? ' disabled title="No podés cambiar tu propio rol"' : ''}>Otorgar admin</button>`}
       </div>
       <p class="admin-detail__hint">
         El usuario tiene que cerrar sesión y volver a entrar (o esperar hasta
         una hora) para que el nuevo permiso aparezca del lado del cliente.
       </p>
+
+      <h4 class="admin-detail__subtitle">Zona peligrosa</h4>
+      <div class="admin-detail__actions">
+        <button class="admin-button admin-button--danger" id="user-delete"${isSelf ? ' disabled title="No podés eliminar tu propia cuenta"' : ''}>
+          Eliminar usuario
+        </button>
+      </div>
+      <p class="admin-detail__hint">
+        Borra la cuenta, el perfil y los accesos demo. No se puede deshacer.
+      </p>
     </div>
   `;
 
   DEMO_PRODUCTS.forEach(p => attachDemoHandlers(p.id));
-  document.getElementById('user-make-admin')?.addEventListener('click', () => updateAdmin(user, true));
-  document.getElementById('user-revoke-admin')?.addEventListener('click', () => updateAdmin(user, false));
+  document.getElementById('user-toggle-admin')?.addEventListener('click', () => updateAdmin(user, !isAdmin));
+  document.getElementById('user-delete')?.addEventListener('click', () => removeUser(user));
 }
 
 function findDemo(productId) {
@@ -302,11 +311,13 @@ function attachDemoHandlers(productId) {
 }
 
 async function updateAdmin(user, makeAdmin) {
-  const id = makeAdmin ? 'user-make-admin' : 'user-revoke-admin';
-  const btn = document.getElementById(id);
+  const btn = document.getElementById('user-toggle-admin');
   if (btn) btn.disabled = true;
   try {
     await setAdminClaim(user.uid, makeAdmin);
+    user.admin = makeAdmin; // reflejar localmente para que el botón cambie
+    renderList();
+    renderDetail();
     showToast(makeAdmin ? 'Admin otorgado' : 'Admin revocado', 'success');
   } catch (err) {
     console.error('UsersTab: setAdminClaim failed', err);
@@ -314,8 +325,35 @@ async function updateAdmin(user, makeAdmin) {
       ? 'No tenés permiso para cambiar roles de admin.'
       : err.message || 'No pudimos completar la operación.';
     showToast(msg, 'error');
-  } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+async function removeUser(user) {
+  const ok = window.confirm(
+    `¿Eliminar definitivamente a "${user.displayName || user.email || 'este usuario'}"?\n\n` +
+    'Se borra su cuenta, su perfil y sus accesos demo. Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+
+  const btn = document.getElementById('user-delete');
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminando…'; }
+
+  try {
+    await deleteUser(user.uid);
+    users = users.filter(u => u.uid !== user.uid);
+    selectedUid = null;
+    selectedDemos = [];
+    applyFilter();
+    renderList();
+    setTopbarMeta(metaText());
+    const detail = document.getElementById('users-detail');
+    if (detail) detail.innerHTML = detailPlaceholder();
+    showToast('Usuario eliminado', 'success');
+  } catch (err) {
+    console.error('UsersTab: delete user failed', err);
+    showToast(`No pudimos eliminar el usuario: ${err.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Eliminar usuario'; }
   }
 }
 

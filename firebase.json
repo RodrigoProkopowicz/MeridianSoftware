@@ -31,6 +31,8 @@
       { "source": "/admin/**", "destination": "/admin.html" },
       { "source": "/promo", "destination": "/promo.html" },
       { "source": "/promo/**", "destination": "/promo.html" },
+      { "source": "/cuenta", "destination": "/cuenta.html" },
+      { "source": "/cuenta/**", "destination": "/cuenta.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
@@ -55,6 +57,13 @@
       },
       {
         "source": "promo.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+          { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+        ]
+      },
+      {
+        "source": "cuenta.html",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
           { "key": "X-Robots-Tag", "value": "noindex, nofollow" }

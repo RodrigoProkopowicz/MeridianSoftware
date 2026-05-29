@@ -199,9 +199,6 @@ exports.cancelPromotionalSubscription = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
-    if (request.auth.token.admin !== true) {
-      throw new HttpsError('permission-denied', 'Admin privileges required.');
-    }
 
     const { subscriptionId } = request.data || {};
     if (typeof subscriptionId !== 'string' || !subscriptionId) {
@@ -215,7 +212,14 @@ exports.cancelPromotionalSubscription = onCall(
       throw new HttpsError('not-found', 'Subscription not found.');
     }
 
-    const { preapprovalId } = snap.data() || {};
+    const data = snap.data() || {};
+    // Permitido para un admin O para el dueño de la suscripción (baja self-service).
+    const isOwner = !!data.userId && data.userId === request.auth.uid;
+    if (request.auth.token.admin !== true && !isOwner) {
+      throw new HttpsError('permission-denied', 'No tenés permiso para cancelar esta suscripción.');
+    }
+
+    const { preapprovalId } = data;
     if (preapprovalId) {
       try {
         await cancelPreapproval(mpAccessToken.value(), preapprovalId);
@@ -244,6 +248,60 @@ exports.cancelPromotionalSubscription = onCall(
     return { subscriptionId, paymentStatus: 'cancelled' };
   }
 );
+
+// ============================================================
+// listMyProducts — productos del usuario autenticado (vista saneada)
+// ============================================================
+const DEMO_LABELS = { 'stock-manager': 'Stock Manager', medicus: 'Medicus' };
+const DEMO_URLS = { 'stock-manager': '/stock-manager', medicus: '/medicus' };
+
+exports.listMyProducts = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const uid = request.auth.uid;
+  const db = getFirestore();
+  const ms = (ts) => (ts && typeof ts.toMillis === 'function' ? ts.toMillis() : null);
+
+  // 1. Sitios web (suscripciones del usuario) — solo campos no sensibles.
+  const subsSnap = await db.collection(COLLECTION).where('userId', '==', uid).get();
+  const websites = subsSnap.docs.map((d) => {
+    const s = d.data();
+    const paymentStatus = s.paymentStatus || 'pending';
+    return {
+      id: d.id,
+      businessName: s.businessName || '',
+      businessType: s.businessType || '',
+      paymentStatus,
+      workStatus: s.workStatus || 'no_iniciado',
+      amount: typeof s.amount === 'number' ? s.amount : null,
+      currency: s.currency || 'ARS',
+      wantsDomain: s.wantsDomain === true,
+      createdAt: ms(s.createdAt),
+      lastPaymentAt: ms(s.lastPaymentAt),
+      canCancel: ['authorized', 'pending', 'paused'].includes(paymentStatus),
+    };
+  });
+  websites.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  // 2. Demos / pruebas (users/{uid}/demoAccess).
+  const demoSnap = await db.collection('users').doc(uid).collection('demoAccess').get();
+  const now = Date.now();
+  const demos = demoSnap.docs.map((d) => {
+    const dm = d.data();
+    const expiresAt = ms(dm.expiresAt);
+    return {
+      productId: d.id,
+      label: DEMO_LABELS[d.id] || d.id,
+      status: expiresAt && expiresAt < now ? 'expired' : 'active',
+      grantedAt: ms(dm.grantedAt),
+      expiresAt,
+      url: DEMO_URLS[d.id] || '/',
+    };
+  });
+
+  return { websites, demos };
+});
 
 /**
  * updatePromotionalAmount — cambia el monto mensual de una suscripción (admin).

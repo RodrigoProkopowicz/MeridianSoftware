@@ -8,6 +8,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         admin: resolve(__dirname, 'admin.html'),
         promo: resolve(__dirname, 'promo.html'),
+        cuenta: resolve(__dirname, 'cuenta.html'),
       },
     },
   },

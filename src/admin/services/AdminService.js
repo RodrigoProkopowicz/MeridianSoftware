@@ -26,6 +26,7 @@ import firebaseApp from '../../config/FirebaseConfig.js';
 
 const functions = getFunctions(firebaseApp);
 const setAdminClaimCallable = httpsCallable(functions, 'setAdminClaim');
+const deleteUserCallable = httpsCallable(functions, 'deleteUser');
 const cancelPromotionalCallable = httpsCallable(functions, 'cancelPromotionalSubscription');
 const updatePromotionalAmountCallable = httpsCallable(functions, 'updatePromotionalAmount');
 
@@ -189,6 +190,17 @@ export async function extendDemoAccess(uid, productId, days = DEFAULT_DEMO_DAYS)
  */
 export async function setAdminClaim(uid, admin) {
   const result = await setAdminClaimCallable({ uid, admin });
+  return result.data;
+}
+
+/**
+ * Elimina definitivamente un usuario: cuenta de Authentication, doc
+ * `users/{uid}` y subcolección demoAccess. Va por callable (Admin SDK). Solo
+ * admins; el backend no permite borrarse a uno mismo.
+ * @param {string} uid
+ */
+export async function deleteUser(uid) {
+  const result = await deleteUserCallable({ uid });
   return result.data;
 }
 

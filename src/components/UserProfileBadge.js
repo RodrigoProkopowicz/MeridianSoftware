@@ -10,6 +10,10 @@ import { onAuthStateChange, signOut, getCurrentUser } from '../services/Authenti
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
 import { showToast, escapeHtml } from '../utils/DomHelper.js';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import firebaseApp from '../config/FirebaseConfig.js';
+
+const listMyProductsCallable = httpsCallable(getFunctions(firebaseApp), 'listMyProducts');
 
 /**
  * Renders the user profile badge placeholder HTML with a skeleton loader.
@@ -76,6 +80,7 @@ function renderLoggedInState(container, user, opts = {}) {
         <div class="user-profile-badge__dropdown-name">${displayName}</div>
         <div class="user-profile-badge__dropdown-email">${email}</div>
       </div>
+      <a class="user-profile-badge__dropdown-item" id="profile-products-link" href="/cuenta" hidden>Mis Productos</a>
       ${isAdmin
         ? `<a class="user-profile-badge__dropdown-item user-profile-badge__dropdown-item--admin" href="/admin">Panel admin</a>`
         : ''}
@@ -110,6 +115,27 @@ function renderLoggedInState(container, user, opts = {}) {
         showToast('No pudimos cerrar la sesión', 'error');
       }
     });
+  }
+
+  // Mostrar "Mis Productos" en el dropdown solo si el usuario tiene productos.
+  maybeShowProductsLink();
+}
+
+/**
+ * Revela el link "Mis Productos" del dropdown si el usuario tiene al menos un
+ * producto. Si la llamada falla, lo mostramos igual (no bloqueamos el acceso).
+ */
+async function maybeShowProductsLink() {
+  let show = true;
+  try {
+    const { data } = await listMyProductsCallable();
+    const count = (data?.websites?.length || 0) + (data?.demos?.length || 0);
+    show = count > 0;
+  } catch (err) {
+    console.warn('UserProfileBadge: listMyProducts failed', err);
+  }
+  if (show) {
+    document.getElementById('profile-products-link')?.removeAttribute('hidden');
   }
 }
 

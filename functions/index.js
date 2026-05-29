@@ -14,6 +14,7 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
 initializeApp();
@@ -134,6 +135,7 @@ exports.createPromotionalPreapproval  = promotional.createPromotionalPreapproval
 exports.mercadoPagoWebhook            = promotional.mercadoPagoWebhook;
 exports.cancelPromotionalSubscription = promotional.cancelPromotionalSubscription;
 exports.updatePromotionalAmount       = promotional.updatePromotionalAmount;
+exports.listMyProducts                = promotional.listMyProducts;
 
 /**
  * setAdminClaim — callable that grants or revokes the `admin` custom claim
@@ -172,5 +174,57 @@ exports.setAdminClaim = onCall(async (request) => {
   if (!admin) delete nextClaims.admin;
   await auth.setCustomUserClaims(uid, nextClaims);
 
+  // Reflejamos el rol en el doc para que el panel pueda mostrar quién es admin
+  // (los custom claims no se pueden consultar desde el cliente). Campo aparte
+  // de `role` (que es el super-admin de Stock Manager).
+  await getFirestore().collection('users').doc(uid).set({ admin }, { merge: true });
+
   return { uid, admin };
+});
+
+/**
+ * deleteUser — borra definitivamente un usuario: su cuenta de Authentication,
+ * el doc `users/{uid}` y la subcolección `demoAccess`. Solo admins. No se puede
+ * borrar a uno mismo.
+ *
+ * Input:  { uid: string }
+ * Output: { uid, deleted: true }
+ */
+exports.deleteUser = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Admin privileges required.');
+  }
+
+  const { uid } = request.data || {};
+  if (typeof uid !== 'string' || uid.length === 0) {
+    throw new HttpsError('invalid-argument', '`uid` must be a non-empty string.');
+  }
+  if (uid === request.auth.uid) {
+    throw new HttpsError('failed-precondition', 'No podés eliminar tu propia cuenta.');
+  }
+
+  const db = getFirestore();
+  const userRef = db.collection('users').doc(uid);
+
+  // 1. Borramos la subcolección demoAccess (no se borra sola al borrar el doc).
+  const demoSnap = await userRef.collection('demoAccess').get();
+  await Promise.all(demoSnap.docs.map(d => d.ref.delete()));
+
+  // 2. Borramos el doc del usuario.
+  await userRef.delete();
+
+  // 3. Borramos la cuenta de Authentication (ignoramos si ya no existe).
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (err) {
+    if (err.code !== 'auth/user-not-found') {
+      console.error('deleteUser: auth delete failed', err.message);
+      throw new HttpsError('internal', `No pudimos borrar la cuenta: ${err.message}`);
+    }
+  }
+
+  return { uid, deleted: true };
 });
