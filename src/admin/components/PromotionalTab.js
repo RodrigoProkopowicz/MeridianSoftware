@@ -13,6 +13,7 @@ import {
   updatePromotionalSubscription,
   cancelPromotionalSubscription,
   updatePromotionalAmount,
+  deletePromotionalSubscription,
 } from '../services/AdminService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp } from '../utils/Format.js';
@@ -195,6 +196,8 @@ function renderDetail() {
   const canCancel = payment === 'authorized' || payment === 'pending' || payment === 'paused';
   // El precio sólo se puede cambiar si hay una suscripción viva en MP.
   const canEditPrice = !!sub.preapprovalId && canCancel;
+  // Solo se pueden borrar registros con error o cancelados (limpieza de logs).
+  const canDelete = payment === 'error' || payment === 'cancelled';
   const amount = Number(sub.amount ?? 6499);
 
   container.innerHTML = `
@@ -259,6 +262,7 @@ function renderDetail() {
         <div class="admin-detail__actions">
           <button class="admin-button admin-button--primary" id="promo-save" type="button">Guardar cambios</button>
           ${canCancel ? `<button class="admin-button admin-button--danger" id="promo-cancel" type="button">Cancelar suscripción</button>` : ''}
+          ${canDelete ? `<button class="admin-button admin-button--danger" id="promo-delete" type="button">Eliminar registro</button>` : ''}
         </div>
       </div>
     </div>
@@ -267,6 +271,7 @@ function renderDetail() {
   document.getElementById('promo-save')?.addEventListener('click', () => saveSubscription(sub));
   document.getElementById('promo-cancel')?.addEventListener('click', () => cancelSubscription(sub));
   document.getElementById('promo-amount-save')?.addEventListener('click', () => updateAmount(sub));
+  document.getElementById('promo-delete')?.addEventListener('click', () => deleteSubscription(sub));
 }
 
 async function saveSubscription(sub) {
@@ -285,6 +290,29 @@ async function saveSubscription(sub) {
     showToast(`No pudimos guardar: ${err.message}`, 'error');
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+async function deleteSubscription(sub) {
+  const ok = window.confirm(
+    `¿Eliminar definitivamente el registro de "${sub.businessName || 'este cliente'}"?\n\nSolo se borra del panel (es un registro con error o cancelado). Esta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+
+  const btn = document.getElementById('promo-delete');
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminando…'; }
+
+  try {
+    await deletePromotionalSubscription(sub.id);
+    subscriptions = subscriptions.filter(s => s.id !== sub.id);
+    if (selectedId === sub.id) selectedId = null;
+    renderList();
+    renderDetail();
+    showToast('Registro eliminado', 'success');
+  } catch (err) {
+    console.error('PromotionalTab: delete failed', err);
+    showToast(`No pudimos eliminar: ${err.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Eliminar registro'; }
   }
 }
 

@@ -99,10 +99,14 @@ exports.createPromotionalPreapproval = onCall(
         backUrl,
       });
     } catch (err) {
-      logger.error('createPromotionalPreapproval: MP error', err.mpBody || err.message);
+      // Serializamos el cuerpo del error de MP a string para que sea legible en
+      // los logs (firebase functions:log no muestra objetos anidados) y en el
+      // panel admin ("Notas internas").
+      const mpDetail = JSON.stringify(err.mpBody || err.message);
+      logger.error(`createPromotionalPreapproval: MP error (status ${err.status || '?'}): ${mpDetail}`);
       await docRef.update({
         paymentStatus: 'error',
-        adminNotes: `Error al crear suscripción en MP: ${err.message}`.slice(0, 500),
+        adminNotes: `Error MP (status ${err.status || '?'}): ${mpDetail}`.slice(0, 1000),
         updatedAt: FieldValue.serverTimestamp(),
       });
       throw new HttpsError('unavailable', 'No pudimos generar el pago. Probá más tarde o escribinos por WhatsApp.');
@@ -216,8 +220,20 @@ exports.cancelPromotionalSubscription = onCall(
       try {
         await cancelPreapproval(mpAccessToken.value(), preapprovalId);
       } catch (err) {
-        logger.error('cancelPromotionalSubscription: MP cancel failed', err.mpBody || err.message);
-        throw new HttpsError('unavailable', `No pudimos cancelar en Mercado Pago: ${err.message}`);
+        // Idempotente: si la preapproval YA está cancelada en MP (p.ej. una
+        // pending que MP expiró, o un doble click), MP responde con error pero
+        // el objetivo ya está cumplido. Verificamos el estado real: si está
+        // cancelada, seguimos y sincronizamos el doc en vez de fallar.
+        let alreadyCancelled = false;
+        try {
+          const pre = await getPreapproval(mpAccessToken.value(), preapprovalId);
+          alreadyCancelled = pre?.status === 'cancelled';
+        } catch (_) { /* no pudimos leerla: caemos al error original */ }
+        if (!alreadyCancelled) {
+          logger.error('cancelPromotionalSubscription: MP cancel failed', err.mpBody || err.message);
+          throw new HttpsError('unavailable', `No pudimos cancelar en Mercado Pago: ${err.message}`);
+        }
+        logger.info('cancelPromotionalSubscription: preapproval ya estaba cancelada en MP', { preapprovalId });
       }
     }
 

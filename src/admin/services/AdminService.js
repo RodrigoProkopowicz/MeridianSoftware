@@ -257,6 +257,15 @@ export async function updatePromotionalAmount(subscriptionId, amount, note) {
   return result.data;
 }
 
+/**
+ * Elimina definitivamente una suscripción promocional. Las reglas de Firestore
+ * solo lo permiten para registros con estado de pago `error` o `cancelled`.
+ * @param {string} id
+ */
+export async function deletePromotionalSubscription(id) {
+  await deleteDoc(doc(db, 'promotionalSubscriptions', id));
+}
+
 // Re-export for UI consumers that need to format Firestore Timestamps.
 export { Timestamp };
 // `collectionGroup` is exported in case future tabs need it (e.g. all

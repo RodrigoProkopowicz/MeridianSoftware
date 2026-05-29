@@ -138,7 +138,10 @@ service cloud.firestore {
       allow update:     if isAdmin()
                            && request.resource.data.diff(resource.data)
                                 .affectedKeys().hasOnly(['workStatus', 'adminNotes', 'updatedAt']);
-      allow delete:     if false;
+      // El admin puede borrar solo registros con error o cancelados (limpieza
+      // de "logs"); nunca activas/pendientes/pausadas, que tienen una sub viva en MP.
+      allow delete:     if isAdmin()
+                           && resource.data.paymentStatus in ['error', 'cancelled'];
     }
 
     // ============================================================
