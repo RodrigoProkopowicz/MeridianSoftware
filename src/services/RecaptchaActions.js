@@ -19,4 +19,7 @@ export const RecaptchaAction = Object.freeze({
 
   /** Authenticated user submitting a demo request. */
   DEMO_REQUEST: 'DEMO_REQUEST',
+
+  /** Visitor (no login) submitting the promotional subscription form. */
+  PROMO_SUBSCRIBE: 'PROMO_SUBSCRIBE',
 });

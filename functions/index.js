@@ -125,6 +125,16 @@ exports.requestAfipCAE      = afip.requestAfipCAE;
 exports.lookupCuitPadron    = afip.lookupCuitPadron;
 exports.setupAfipExpress    = afip.setupAfipExpress;
 
+// ============================================================
+// PromotionalSection — suscripciones Mercado Pago
+// Módulo autocontenido en functions/promotional/.
+// ============================================================
+const promotional = require('./promotional');
+exports.createPromotionalPreapproval  = promotional.createPromotionalPreapproval;
+exports.mercadoPagoWebhook            = promotional.mercadoPagoWebhook;
+exports.cancelPromotionalSubscription = promotional.cancelPromotionalSubscription;
+exports.updatePromotionalAmount       = promotional.updatePromotionalAmount;
+
 /**
  * setAdminClaim — callable that grants or revokes the `admin` custom claim
  * on a target user. Only existing admins may call it.

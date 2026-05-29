@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100">
+  <ellipse cx="80" cy="50" rx="76" ry="46" fill="#1e2871"/>
+  <ellipse cx="80" cy="50" rx="70" ry="40" fill="#ffffff"/>
+  <ellipse cx="80" cy="50" rx="64" ry="34" fill="#1e2871"/>
+  <text x="80" y="68" fill="#ffffff" text-anchor="middle" font-family="'Plus Jakarta Sans', Inter, system-ui, sans-serif" font-weight="800" font-size="46" letter-spacing="-1">SP</text>
+</svg>

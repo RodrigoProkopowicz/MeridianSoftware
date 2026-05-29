@@ -29,6 +29,8 @@
       { "source": "/medicus/**", "destination": "/medicus/index.html" },
       { "source": "/admin", "destination": "/admin.html" },
       { "source": "/admin/**", "destination": "/admin.html" },
+      { "source": "/promo", "destination": "/promo.html" },
+      { "source": "/promo/**", "destination": "/promo.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
@@ -46,6 +48,13 @@
       },
       {
         "source": "admin.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+          { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+        ]
+      },
+      {
+        "source": "promo.html",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
           { "key": "X-Robots-Tag", "value": "noindex, nofollow" }

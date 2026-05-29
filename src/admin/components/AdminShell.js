@@ -11,6 +11,7 @@ import { signOut } from '../../services/AuthenticationService.js';
 import { escapeHtml } from '../../utils/DomHelper.js';
 import { renderLeadsTab, initLeadsTab, destroyLeadsTab } from './LeadsTab.js';
 import { renderUsersTab, initUsersTab, destroyUsersTab } from './UsersTab.js';
+import { renderPromotionalTab, initPromotionalTab, destroyPromotionalTab } from './PromotionalTab.js';
 
 const TABS = [
   {
@@ -22,6 +23,11 @@ const TABS = [
     id: 'users',
     label: 'Usuarios',
     icon: `<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>`,
+  },
+  {
+    id: 'promotional',
+    label: 'Promocional',
+    icon: `<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/>`,
   },
 ];
 
@@ -144,6 +150,10 @@ function mountActiveTab() {
     page.innerHTML = renderUsersTab();
     initUsersTab();
     currentDestroy = destroyUsersTab;
+  } else if (activeTab === 'promotional') {
+    page.innerHTML = renderPromotionalTab();
+    initPromotionalTab();
+    currentDestroy = destroyPromotionalTab;
   }
 }
 

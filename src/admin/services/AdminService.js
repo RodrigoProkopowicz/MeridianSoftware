@@ -26,6 +26,8 @@ import firebaseApp from '../../config/FirebaseConfig.js';
 
 const functions = getFunctions(firebaseApp);
 const setAdminClaimCallable = httpsCallable(functions, 'setAdminClaim');
+const cancelPromotionalCallable = httpsCallable(functions, 'cancelPromotionalSubscription');
+const updatePromotionalAmountCallable = httpsCallable(functions, 'updatePromotionalAmount');
 
 /** Products that can have a demoAccess doc. Keep in sync with StockManager / Medicus. */
 export const DEMO_PRODUCTS = [
@@ -196,6 +198,63 @@ export async function setAdminClaim(uid, admin) {
 export async function getUserProfile(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
   return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+}
+
+// ============================================================
+// PromotionalSection — suscripciones (módulo /promo)
+// ============================================================
+
+/**
+ * Lista las suscripciones promocionales, más nuevas primero.
+ * @param {number} [max=200]
+ */
+export async function listPromotionalSubscriptions(max = 200) {
+  const q = query(
+    collection(db, 'promotionalSubscriptions'),
+    orderBy('createdAt', 'desc'),
+    limit(max),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Actualiza el estado del trabajo y/o las notas internas de una suscripción.
+ * Solo estos campos son editables desde el panel — el estado de pago se
+ * sincroniza server-side (webhook / cancelación). Las reglas de Firestore
+ * rechazan cualquier otro campo.
+ *
+ * @param {string} id
+ * @param {{ workStatus?: string, adminNotes?: string }} patch
+ */
+export async function updatePromotionalSubscription(id, patch) {
+  await updateDoc(doc(db, 'promotionalSubscriptions', id), {
+    ...patch,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Cancela la suscripción en Mercado Pago y marca el doc como cancelado.
+ * Va por callable porque toca el access token de MP (solo server-side).
+ * @param {string} subscriptionId
+ */
+export async function cancelPromotionalSubscription(subscriptionId) {
+  const result = await cancelPromotionalCallable({ subscriptionId });
+  return result.data;
+}
+
+/**
+ * Cambia el monto mensual de una suscripción (por cliente). Va por callable
+ * porque actualiza el preapproval en Mercado Pago y persiste el doc en un solo
+ * paso server-side (MP y Firestore quedan sincronizados).
+ * @param {string} subscriptionId
+ * @param {number} amount  — nuevo monto mensual en ARS (entero)
+ * @param {string} [note]  — motivo opcional del ajuste (auditoría)
+ */
+export async function updatePromotionalAmount(subscriptionId, amount, note) {
+  const result = await updatePromotionalAmountCallable({ subscriptionId, amount, note });
+  return result.data;
 }
 
 // Re-export for UI consumers that need to format Firestore Timestamps.

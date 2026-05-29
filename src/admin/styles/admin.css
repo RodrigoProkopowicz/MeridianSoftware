@@ -780,6 +780,12 @@ body {
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
+.admin-detail__name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: var(--space-sm) 0 var(--space-md);
+}
+.admin-detail__actions--contact { margin-bottom: var(--space-md); }
 
 .admin-detail__list {
   display: grid;
@@ -822,6 +828,21 @@ body {
 
 .admin-detail__edit { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-md); }
 .admin-detail__actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-sm); }
+.admin-detail__price {
+  border-top: 1px solid var(--color-surface-glass-border);
+  padding-top: var(--space-md);
+}
+.promo-price-history { margin-top: var(--space-xs); }
+.promo-price-history__list {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
 .admin-detail__hint {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);

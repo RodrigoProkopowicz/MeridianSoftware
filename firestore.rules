@@ -125,6 +125,22 @@ service cloud.firestore {
       allow write:      if false;
     }
 
+    // ---- promotionalSubscriptions/{id} ----
+    // Suscripciones del módulo /promo (PromotionalSection). El documento lo crea
+    // y actualiza la Cloud Function `createPromotionalPreapproval` / el webhook
+    // de Mercado Pago vía Admin SDK (bypassea estas reglas), por eso el cliente
+    // NO puede crear: así el access token de MP y el estado de pago quedan solo
+    // del lado del servidor. El admin lee todo y solo puede editar el estado del
+    // trabajo y sus notas — nunca los campos de pago, que se sincronizan server-side.
+    match /promotionalSubscriptions/{id} {
+      allow read, list: if isAdmin();
+      allow create:     if false;
+      allow update:     if isAdmin()
+                           && request.resource.data.diff(resource.data)
+                                .affectedKeys().hasOnly(['workStatus', 'adminNotes', 'updatedAt']);
+      allow delete:     if false;
+    }
+
     // ============================================================
     // Stock Manager — businesses + subcollections
     // Used by /stock-manager (separate Vite app, same Firebase project).
