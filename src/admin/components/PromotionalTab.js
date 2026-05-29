@@ -214,6 +214,7 @@ function renderDetail() {
       <dl class="admin-detail__list">
         <dt>Rubro</dt><dd>${escapeHtml(sub.businessType || '—')}</dd>
         <dt>Email</dt><dd>${escapeHtml(sub.email || '—')}</dd>
+        ${sub.userEmail ? `<dt>Cuenta</dt><dd>${escapeHtml(sub.userEmail)}</dd>` : ''}
         <dt>Teléfono</dt><dd>${escapeHtml(sub.phoneRaw || sub.phone || '—')}</dd>
         <dt>Dominio propio</dt><dd>${sub.wantsDomain ? 'Sí, le interesa' : 'No'}</dd>
         <dt>Qué necesita</dt>

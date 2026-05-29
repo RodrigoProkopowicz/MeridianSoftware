@@ -65,6 +65,9 @@ export async function startSubscription(payload) {
  */
 function messageForError(err) {
   const code = err?.code || '';
+  if (code.includes('unauthenticated')) {
+    return 'Iniciá sesión para continuar y volvé a intentar.';
+  }
   if (code.includes('invalid-argument')) {
     return 'Revisá los datos del formulario e intentá de nuevo.';
   }

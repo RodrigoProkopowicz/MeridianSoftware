@@ -15,6 +15,12 @@ export const PLAN = Object.freeze({
   period: 'por mes',
 });
 
+/**
+ * Fin de la promoción (precio promocional + cuenta regresiva).
+ * Instante fijo con offset de Argentina (UTC-3): lunes 1/6/2026 03:00 AM ART.
+ */
+export const PROMO_DEADLINE = '2026-06-01T03:00:00-03:00';
+
 /** WhatsApp de contacto del vendedor (solo dígitos, con código de país). */
 export const CONTACT_WHATSAPP = '5491100000000';
 

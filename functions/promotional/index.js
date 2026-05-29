@@ -41,11 +41,17 @@ const {
 const COLLECTION = 'promotionalSubscriptions';
 
 // ============================================================
-// createPromotionalPreapproval — callable público
+// createPromotionalPreapproval — requiere sesión (cuenta compartida con el sitio)
 // ============================================================
 exports.createPromotionalPreapproval = onCall(
   { secrets: [mpAccessToken] },
   async (request) => {
+    // El formulario está gateado tras el login: exigimos sesión para crear la
+    // suscripción y la atamos a la cuenta del usuario (la misma del sitio principal).
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Iniciá sesión para continuar.');
+    }
+
     const clean = validateAndClean(request.data || {});
 
     // 1. reCAPTCHA — si hay token y el score es bajo, rechazamos. Si no hay
@@ -67,6 +73,8 @@ exports.createPromotionalPreapproval = onCall(
     const docRef = db.collection(COLLECTION).doc();
     await docRef.set({
       ...clean,
+      userId: request.auth.uid,
+      userEmail: request.auth.token.email || null,
       paymentStatus: 'pending',
       workStatus: 'no_iniciado',
       amount: PLAN.amount,
