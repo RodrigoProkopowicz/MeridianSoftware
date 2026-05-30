@@ -14,10 +14,29 @@
 
 .navigation-bar.scrolled {
   padding: var(--space-sm) 0;
+}
+
+/* Glass background lives on a pseudo-element, NOT on the nav itself.
+   A backdrop-filter on the nav would make it the containing block for the
+   fixed mobile menu (its descendant), collapsing the menu to the bar's
+   height whenever the page is scrolled. Keeping the filter on ::before — a
+   child, never an ancestor of the menu — sidesteps that trap entirely. */
+.navigation-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
   background: rgba(15, 25, 35, 0.92);
+  border-bottom: 1px solid rgba(232, 220, 200, 0.06);
+  transition: opacity var(--transition-slow);
+  pointer-events: none;
+}
+
+.navigation-bar.scrolled::before {
+  opacity: 1;
   backdrop-filter: blur(var(--blur-lg));
   -webkit-backdrop-filter: blur(var(--blur-lg));
-  border-bottom: 1px solid rgba(232, 220, 200, 0.06);
 }
 
 .navigation-bar__inner {
@@ -42,10 +61,42 @@
   height: 32px;
 }
 
+/* Desktop section nav = a glass "segmented control". The capsule gives the
+   links structure (no more dim text floating on the hero), and the per-pill
+   padding is where the breathing room comes from. */
 .navigation-bar__links {
   display: flex;
   align-items: center;
-  gap: var(--space-2xl);
+  gap: var(--space-xs);
+  padding: 5px;
+  background: rgba(232, 220, 200, 0.04);
+  border: 1px solid var(--color-surface-glass-border);
+  border-radius: var(--radius-full);
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  backdrop-filter: blur(var(--blur-sm));
+}
+
+.navigation-bar__links .navigation-bar__link {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.navigation-bar__links .navigation-bar__link:hover {
+  background: rgba(232, 220, 200, 0.07);
+}
+
+/* Active = filled accent pill. Clear, on-brand, replaces the underline.
+   The inset ring defines the pill edge without taking layout width (no
+   overflow risk in the tight logged-in range). */
+.navigation-bar__links .navigation-bar__link.active {
+  color: var(--color-accent-light);
+  background: rgba(74, 144, 217, 0.20);
+  box-shadow: inset 0 0 0 1px rgba(74, 144, 217, 0.32);
+}
+
+.navigation-bar__links .navigation-bar__link.active:hover {
+  background: rgba(74, 144, 217, 0.24);
 }
 
 .navigation-bar__link {
@@ -53,20 +104,7 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   letter-spacing: var(--letter-spacing-wide);
-  transition: color var(--transition-fast);
-  position: relative;
-}
-
-.navigation-bar__link::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background: var(--gradient-accent);
-  border-radius: var(--radius-full);
-  transition: width var(--transition-base);
+  transition: all var(--transition-fast);
 }
 
 .navigation-bar__link:hover,
@@ -74,15 +112,163 @@
   color: var(--color-text-primary);
 }
 
-.navigation-bar__link:hover::after,
-.navigation-bar__link.active::after {
-  width: 100%;
-}
-
 .navigation-bar__actions {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+}
+
+/* ============================================
+   Account zone — logged-in identity + actions
+   Inline, no dropdown. Identity is display-only;
+   the actions are the interactive part.
+   ============================================ */
+.nav-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* Identity: never a button/link, never toggles anything. */
+.nav-account__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: default;
+  user-select: none;
+}
+
+.nav-account__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  border: 2px solid rgba(232, 220, 200, 0.15);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.nav-account__avatar--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-accent);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.85rem;
+}
+
+.nav-account__avatar--lg {
+  width: 48px;
+  height: 48px;
+  font-size: 1.15rem;
+}
+
+.nav-account__name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.nav-account__sep {
+  width: 1px;
+  height: 22px;
+  background: var(--color-surface-glass-border);
+  flex-shrink: 0;
+}
+
+.nav-account__links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.nav-account__link {
+  padding: 0.5rem 0.85rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nav-account__link:hover,
+.nav-account__link:focus-visible {
+  color: var(--color-text-primary);
+  background: rgba(232, 220, 200, 0.06);
+}
+
+.nav-account__link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Admin action sits one tier above the rest — accent + outlined pill. */
+.nav-account__link--admin {
+  color: var(--color-accent-light);
+  border-color: rgba(74, 144, 217, 0.35);
+}
+
+.nav-account__link--admin:hover {
+  color: var(--color-accent-light);
+  background: rgba(74, 144, 217, 0.14);
+  border-color: var(--color-accent);
+}
+
+.nav-account__link--signout {
+  color: var(--color-text-muted);
+}
+
+.nav-account__link--signout:hover {
+  color: var(--color-error);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.nav-account__signin {
+  padding: 0.5rem 1.2rem;
+  font-size: var(--font-size-xs);
+}
+
+/* Skeleton while auth resolves */
+.nav-account__skeleton {
+  width: 150px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg,
+    rgba(232, 220, 200, 0.04) 0%,
+    rgba(232, 220, 200, 0.10) 50%,
+    rgba(232, 220, 200, 0.04) 100%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+.nav-account__skeleton--menu {
+  width: 100%;
+  height: 48px;
+}
+
+@keyframes skeletonPulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Smaller desktops (1025–1200px): tighten the inline layout so the rich
+   account zone + section links can't overflow before the hamburger takes
+   over at 1024px. */
+@media (min-width: 1025px) and (max-width: 1200px) {
+  .navigation-bar__links { gap: 2px; }
+  .navigation-bar__links .navigation-bar__link { padding: 0.45rem 0.65rem; }
+  .nav-account { gap: var(--space-sm); }
+  .nav-account__name { max-width: 92px; }
+  .nav-account__link { padding: 0.45rem 0.6rem; }
 }
 
 /* ---- Mobile Hamburger ----
@@ -150,35 +336,27 @@
 .navigation-bar__mobile-menu {
   display: none;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 25, 35, 0.97);
+  inset: 0;
+  background: rgba(15, 25, 35, 0.98);
   backdrop-filter: blur(var(--blur-lg));
   -webkit-backdrop-filter: blur(var(--blur-lg));
   z-index: var(--z-sticky);
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(var(--space-lg), 5vh, var(--space-2xl));
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  align-items: stretch;
+  justify-content: flex-start;
+  padding:
+    calc(env(safe-area-inset-top) + 86px)
+    clamp(1.5rem, 6vw, 2.5rem)
+    calc(env(safe-area-inset-bottom) + var(--space-2xl));
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-slow);
-  /* No scroll inside the menu — content is sized to always fit. Combined
-     with overscroll-behavior below, this removes the iOS Safari
-     rubber-band bounce that triggers when the user tries to scroll. */
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: none;
-}
-
-/* Menu items must opt back in to pointer events since the container
-   uses touch-action: none to block scroll gestures. */
-.navigation-bar__mobile-menu .navigation-bar__link {
-  touch-action: manipulation;
+  /* The menu now carries identity + account actions, so on small phones it can
+     exceed the viewport — let it scroll, but contain the gesture so it never
+     chains to the page behind it. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .navigation-bar__mobile-menu.open {
@@ -187,11 +365,94 @@
   pointer-events: all;
 }
 
-.navigation-bar__mobile-menu .navigation-bar__link {
-  font-size: var(--font-size-xl);
+.navigation-bar__mobile-links {
+  display: flex;
+  flex-direction: column;
 }
 
-@media (max-width: 768px) {
+.navigation-bar__mobile-menu .navigation-bar__link {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: var(--space-sm) 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  border-bottom: 1px solid rgba(232, 220, 200, 0.06);
+  touch-action: manipulation;
+}
+
+/* No animated underline in the stacked menu — color + divider carry state. */
+.navigation-bar__mobile-menu .navigation-bar__link::after {
+  display: none;
+}
+
+/* ---- Mobile account block (identity + actions, inside the menu) ---- */
+.navigation-bar__mobile-account {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-surface-glass-border);
+}
+
+/* Identity header — display-only, mirrors the desktop identity rule. */
+.nav-menu-account__profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0 var(--space-md);
+  cursor: default;
+  user-select: none;
+}
+
+.nav-menu-account__name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.nav-menu-account__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-sm) 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  touch-action: manipulation;
+}
+
+.nav-menu-account__item:hover,
+.nav-menu-account__item:focus-visible {
+  color: var(--color-text-primary);
+}
+
+/* Admin action — accent, one tier above the rest. */
+.nav-menu-account__item--admin {
+  color: var(--color-accent-light);
+}
+
+.nav-menu-account__item--signout {
+  color: var(--color-error);
+}
+
+.nav-menu-account__signin {
+  width: 100%;
+  margin-top: var(--space-md);
+}
+
+/* Tablets and below: the section links and the account zone both collapse
+   into the hamburger menu, so the bar stays logo + hamburger only. The 1024px
+   threshold guarantees the inline desktop layout only renders with room to
+   spare — no overflow in the awkward 768–1024 range. */
+@media (max-width: 1024px) {
   .navigation-bar__links {
     display: none;
   }
@@ -200,7 +461,7 @@
     display: block;
   }
 
-  .navigation-bar__actions .user-profile-badge__name {
+  .nav-account {
     display: none;
   }
 }

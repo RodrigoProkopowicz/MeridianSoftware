@@ -39,11 +39,16 @@ export function renderNavigationBar() {
       </div>
 
       <div class="navigation-bar__mobile-menu" id="mobile-menu">
-        <a href="#hero" class="navigation-bar__link" data-section="hero" data-mobile-link>Inicio</a>
-        <a href="#products" class="navigation-bar__link" data-section="products" data-mobile-link>Productos</a>
-        <a href="#solutions" class="navigation-bar__link" data-section="solutions" data-mobile-link>Servicios</a>
-        <a href="#demo" class="navigation-bar__link" data-section="demo" data-mobile-link>Demo</a>
-        <a href="#contact" class="navigation-bar__link" data-section="contact" data-mobile-link>Contacto</a>
+        <nav class="navigation-bar__mobile-links" aria-label="Navegación principal">
+          <a href="#hero" class="navigation-bar__link" data-section="hero" data-mobile-link>Inicio</a>
+          <a href="#products" class="navigation-bar__link" data-section="products" data-mobile-link>Productos</a>
+          <a href="#solutions" class="navigation-bar__link" data-section="solutions" data-mobile-link>Servicios</a>
+          <a href="#demo" class="navigation-bar__link" data-section="demo" data-mobile-link>Demo</a>
+          <a href="#contact" class="navigation-bar__link" data-section="contact" data-mobile-link>Contacto</a>
+        </nav>
+        <div class="navigation-bar__mobile-account" id="nav-mobile-account" aria-label="Cuenta">
+          <div class="nav-account__skeleton nav-account__skeleton--menu" aria-hidden="true"></div>
+        </div>
       </div>
     </nav>
   `;
@@ -89,7 +94,7 @@ function toggleMobileMenu() {
   if (isOpen) lockBodyScroll(); else unlockBodyScroll();
 }
 
-function closeMobileMenu() {
+export function closeMobileMenu() {
   const hamburger = document.getElementById('hamburger-button');
   const mobileMenu = document.getElementById('mobile-menu');
 

@@ -1,12 +1,18 @@
 /**
  * UserProfileBadge.js
- * 
- * Displays the authenticated user's avatar and name in the navbar.
- * Shows a dropdown with sign-out option.
- * Shows a "Sign In" button when not authenticated.
+ *
+ * Renders the authenticated user's account zone in the navbar — directly,
+ * without a dropdown. The identity (avatar + name) is display-only and is
+ * never clickable; the account actions (Mis Productos, Panel, Cerrar sesión)
+ * sit beside it on desktop and inside the hamburger menu on mobile.
+ *
+ * One auth subscription drives BOTH surfaces so desktop and mobile never drift:
+ *   - desktop slot:  #nav-account   (in the navbar actions area)
+ *   - mobile slot:   #nav-mobile-account  (inside the hamburger menu)
  */
 
-import { onAuthStateChange, signOut, getCurrentUser } from '../services/AuthenticationService.js';
+import { onAuthStateChange, signOut } from '../services/AuthenticationService.js';
+import { closeMobileMenu } from './NavigationBar.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
 import { showToast, escapeHtml } from '../utils/DomHelper.js';
@@ -16,25 +22,27 @@ import firebaseApp from '../config/FirebaseConfig.js';
 const listMyProductsCallable = httpsCallable(getFunctions(firebaseApp), 'listMyProducts');
 
 /**
- * Renders the user profile badge placeholder HTML with a skeleton loader.
- * Actual content is populated by initUserProfileBadge once auth resolves.
+ * Renders the desktop account slot with a skeleton loader. Actual content is
+ * populated by initUserProfileBadge once auth resolves.
  * @returns {string}
  */
 export function renderUserProfileBadge() {
   return `
-    <div class="user-profile-badge" id="user-profile-badge">
-      <div class="user-profile-badge__skeleton" aria-hidden="true"></div>
+    <div class="nav-account" id="nav-account">
+      <div class="nav-account__skeleton" aria-hidden="true"></div>
     </div>
   `;
 }
 
 /**
- * Initializes the user profile badge and subscribes to auth changes.
+ * Subscribes to auth changes and (re)renders both the desktop and mobile
+ * account surfaces on every change.
  * @param {Function} openAuthModal
  */
 export function initUserProfileBadge(openAuthModal) {
-  const badge = document.getElementById('user-profile-badge');
-  if (!badge) return;
+  const desktop = document.getElementById('nav-account');
+  const mobile = document.getElementById('nav-mobile-account');
+  if (!desktop) return;
 
   onAuthStateChange(async user => {
     if (user) {
@@ -46,84 +54,122 @@ export function initUserProfileBadge(openAuthModal) {
         // Token fetch failures shouldn't break the badge — fall back to non-admin.
         console.warn('UserProfileBadge: failed to read admin claim', err);
       }
-      renderLoggedInState(badge, user, { isAdmin });
+      desktop.innerHTML = desktopLoggedIn(user, { isAdmin });
+      if (mobile) mobile.innerHTML = mobileLoggedIn(user, { isAdmin });
+      wireHandlers(openAuthModal);
+      // "Mis Productos" is revealed only once we know the user has products.
+      maybeShowProductsLink();
     } else {
-      renderLoggedOutState(badge, openAuthModal);
+      desktop.innerHTML = desktopLoggedOut();
+      if (mobile) mobile.innerHTML = mobileLoggedOut();
+      wireHandlers(openAuthModal);
     }
   });
 }
 
-/**
- * Renders the logged-in badge with avatar and dropdown.
- * @param {HTMLElement} container
- * @param {import('firebase/auth').User} user
- * @param {{ isAdmin?: boolean }} [opts]
- */
-function renderLoggedInState(container, user, opts = {}) {
-  const { isAdmin = false } = opts;
-  const initial = escapeHtml((user.displayName || user.email || 'U')[0].toUpperCase());
-  const avatarSrc = user.photoURL ? escapeHtml(user.photoURL) : '';
-  const displayNameRaw = user.displayName || user.email || 'User';
-  const displayName = escapeHtml(displayNameRaw);
-  const firstName = escapeHtml(displayNameRaw.split(' ')[0]);
-  const email = escapeHtml(user.email || '');
+/* ------------------------------------------------------------------ */
+/* Identity (display-only — never interactive)                        */
+/* ------------------------------------------------------------------ */
 
-  container.innerHTML = `
-    ${avatarSrc
-      ? `<img class="user-profile-badge__avatar" src="${avatarSrc}" alt="${displayName}" />`
-      : `<div class="user-profile-badge__avatar user-profile-badge__avatar--initial">${initial}</div>`
-    }
-    ${isAdmin ? `<span class="user-profile-badge__admin-pill">Admin</span>` : ''}
-    <span class="user-profile-badge__name hide-mobile">${firstName}</span>
-    <div class="user-profile-badge__dropdown" id="profile-dropdown">
-      <div class="user-profile-badge__dropdown-header">
-        <div class="user-profile-badge__dropdown-name">${displayName}</div>
-        <div class="user-profile-badge__dropdown-email">${email}</div>
-      </div>
-      <a class="user-profile-badge__dropdown-item" id="profile-products-link" href="/cuenta" hidden>Mis Productos</a>
-      ${isAdmin
-        ? `<a class="user-profile-badge__dropdown-item user-profile-badge__dropdown-item--admin" href="/admin">Panel admin</a>`
-        : ''}
-      <button class="user-profile-badge__dropdown-item" id="sign-out-button">Cerrar sesión</button>
+/**
+ * @param {import('firebase/auth').User} user
+ * @param {string} [modifier] extra avatar class (e.g. size variant)
+ */
+function avatarHtml(user, modifier = '') {
+  const initial = escapeHtml((user.displayName || user.email || 'U')[0].toUpperCase());
+  if (user.photoURL) {
+    // alt="" — the name is shown as adjacent text, so the avatar is decorative.
+    // referrerpolicy avoids Google/Apple CDNs 403-ing the photo request.
+    return `<img class="nav-account__avatar ${modifier}" src="${escapeHtml(user.photoURL)}" alt="" referrerpolicy="no-referrer" />`;
+  }
+  return `<div class="nav-account__avatar nav-account__avatar--initial ${modifier}">${initial}</div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Desktop surface                                                    */
+/* ------------------------------------------------------------------ */
+
+function desktopLoggedIn(user, { isAdmin }) {
+  const fullName = user.displayName || user.email || 'Usuario';
+  const firstName = escapeHtml(fullName.split(' ')[0]);
+
+  return `
+    <div class="nav-account__identity" title="${escapeHtml(fullName)}">
+      ${avatarHtml(user)}
+      <span class="nav-account__name">${firstName}</span>
+    </div>
+    <span class="nav-account__sep" aria-hidden="true"></span>
+    <div class="nav-account__links">
+      <a class="nav-account__link" id="nav-products-desktop" href="/cuenta" hidden>Mis Productos</a>
+      ${isAdmin ? `<a class="nav-account__link nav-account__link--admin" href="/admin">Panel</a>` : ''}
+      <button type="button" class="nav-account__link nav-account__link--signout js-signout">Cerrar sesión</button>
     </div>
   `;
+}
 
-  // Toggle dropdown
-  container.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const dropdown = document.getElementById('profile-dropdown');
-    if (dropdown) dropdown.classList.toggle('open');
+function desktopLoggedOut() {
+  return `<button type="button" class="button-secondary nav-account__signin js-signin">Iniciar sesión</button>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile surface (inside the hamburger menu)                         */
+/* ------------------------------------------------------------------ */
+
+function mobileLoggedIn(user, { isAdmin }) {
+  const fullName = escapeHtml(user.displayName || user.email || 'Usuario');
+
+  return `
+    <div class="nav-menu-account__profile">
+      ${avatarHtml(user, 'nav-account__avatar--lg')}
+      <span class="nav-menu-account__name">${fullName}</span>
+    </div>
+    <a class="nav-menu-account__item" id="nav-products-mobile" href="/cuenta" hidden>Mis Productos</a>
+    ${isAdmin ? `<a class="nav-menu-account__item nav-menu-account__item--admin" href="/admin">Panel de administración</a>` : ''}
+    <button type="button" class="nav-menu-account__item nav-menu-account__item--signout js-signout">Cerrar sesión</button>
+  `;
+}
+
+function mobileLoggedOut() {
+  return `<button type="button" class="button-secondary nav-menu-account__signin js-signin">Iniciar sesión</button>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Handlers                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * (Re)binds the sign-in / sign-out controls. Safe to call on every render:
+ * innerHTML was just replaced, so the elements are fresh and listeners don't
+ * accumulate.
+ * @param {Function} openAuthModal
+ */
+function wireHandlers(openAuthModal) {
+  document.querySelectorAll('.js-signout').forEach(btn => {
+    btn.addEventListener('click', handleSignOut);
   });
-
-  // Close dropdown on outside click
-  document.addEventListener('click', () => {
-    const dropdown = document.getElementById('profile-dropdown');
-    if (dropdown) dropdown.classList.remove('open');
-  });
-
-  // Sign out
-  const signOutBtn = document.getElementById('sign-out-button');
-  if (signOutBtn) {
-    signOutBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      try {
-        await signOut();
-        trackEvent(AnalyticsEvent.LOGOUT);
-        showToast('Sesión cerrada', 'success');
-      } catch (error) {
-        console.error('UserProfileBadge: Sign out failed', error);
-        showToast('No pudimos cerrar la sesión', 'error');
-      }
+  document.querySelectorAll('.js-signin').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeMobileMenu();
+      openAuthModal('navbar');
     });
-  }
+  });
+}
 
-  // Mostrar "Mis Productos" en el dropdown solo si el usuario tiene productos.
-  maybeShowProductsLink();
+async function handleSignOut() {
+  try {
+    await signOut();
+    closeMobileMenu();
+    trackEvent(AnalyticsEvent.LOGOUT);
+    showToast('Sesión cerrada', 'success');
+  } catch (error) {
+    console.error('UserProfileBadge: Sign out failed', error);
+    showToast('No pudimos cerrar la sesión', 'error');
+  }
 }
 
 /**
- * Revela el link "Mis Productos" del dropdown si el usuario tiene al menos un
- * producto. Si la llamada falla, lo mostramos igual (no bloqueamos el acceso).
+ * Reveals "Mis Productos" (desktop + mobile) if the user has at least one
+ * product. If the call fails we reveal it anyway — never block access.
  */
 async function maybeShowProductsLink() {
   let show = true;
@@ -135,22 +181,7 @@ async function maybeShowProductsLink() {
     console.warn('UserProfileBadge: listMyProducts failed', err);
   }
   if (show) {
-    document.getElementById('profile-products-link')?.removeAttribute('hidden');
+    document.getElementById('nav-products-desktop')?.removeAttribute('hidden');
+    document.getElementById('nav-products-mobile')?.removeAttribute('hidden');
   }
-}
-
-/**
- * Renders the logged-out state with a sign-in button.
- * @param {HTMLElement} container
- * @param {Function} openAuthModal
- */
-function renderLoggedOutState(container, openAuthModal) {
-  container.innerHTML = `
-    <button class="button-secondary" id="navbar-sign-in-button" style="padding: 0.5rem 1.2rem; font-size: var(--font-size-xs);">
-      Iniciar sesión
-    </button>
-  `;
-
-  const btn = document.getElementById('navbar-sign-in-button');
-  if (btn) btn.addEventListener('click', () => openAuthModal('navbar'));
 }
