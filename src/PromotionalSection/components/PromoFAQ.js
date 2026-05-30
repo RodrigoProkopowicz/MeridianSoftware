@@ -6,9 +6,11 @@
  * Acordeón accesible con <details>/<summary> — sin JS.
  */
 
+import { PLAN } from '../config.js';
+
 const FAQS = [
   {
-    q: '¿Cómo es el pago de los $6.499 por mes?',
+    q: `¿Cómo es el pago de los ${PLAN.priceLabel} por mes?`,
     a: 'Es una suscripción mensual automática a través de Mercado Pago. Se renueva sola cada mes con la tarjeta que cargues, así no tenés que acordarte de pagar. Podés cancelarla cuando quieras.',
   },
   {

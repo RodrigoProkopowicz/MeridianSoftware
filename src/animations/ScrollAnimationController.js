@@ -17,7 +17,7 @@ gsap.registerPlugin(ScrollTrigger);
  * True if the user has requested reduced motion at the OS level.
  * @returns {boolean}
  */
-export function prefersReducedMotion() {
+function prefersReducedMotion() {
   return typeof window !== 'undefined'
     && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,15 +42,6 @@ export function initializeAllAnimations() {
     initParallaxEffects();
     initDeviceSceneAnimation();
   });
-}
-
-/**
- * Destroys all active ScrollTrigger instances.
- * Call before page teardown or route change.
- */
-export function destroyAllAnimations() {
-  ScrollTrigger.getAll().forEach(trigger => trigger.kill());
-  gsap.killTweensOf('*');
 }
 
 /**
@@ -111,5 +102,3 @@ function initParallaxEffects() {
     });
   });
 }
-
-export { gsap, ScrollTrigger };

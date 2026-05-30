@@ -18,6 +18,7 @@ import {
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp } from '../utils/Format.js';
 import { renderTopbarActions, setTopbarMeta } from './AdminShell.js';
+import { PLAN } from '../../PromotionalSection/config.js';
 
 const PAYMENT_LABELS = {
   pending: 'Pendiente',
@@ -198,7 +199,7 @@ function renderDetail() {
   const canEditPrice = !!sub.preapprovalId && canCancel;
   // Solo se pueden borrar registros con error o cancelados (limpieza de logs).
   const canDelete = payment === 'error' || payment === 'cancelled';
-  const amount = Number(sub.amount ?? 6499);
+  const amount = Number(sub.amount ?? PLAN.amount);
 
   container.innerHTML = `
     <div class="admin-detail">
@@ -224,7 +225,7 @@ function renderDetail() {
         <dd class="admin-detail__message">${escapeHtml(sub.description || '—')}</dd>
         ${sub.references ? `<dt>Referencias</dt><dd class="admin-detail__message">${escapeHtml(sub.references)}</dd>` : ''}
         ${sub.stylePreferences ? `<dt>Estilo / colores</dt><dd>${escapeHtml(sub.stylePreferences)}</dd>` : ''}
-        <dt>Cuota</dt><dd>$${escapeHtml(String(sub.amount ?? 6499))} ${escapeHtml(sub.currency || 'ARS')} / mes</dd>
+        <dt>Cuota</dt><dd>$${escapeHtml(String(sub.amount ?? PLAN.amount))} ${escapeHtml(sub.currency || 'ARS')} / mes</dd>
         ${sub.lastPaymentAt ? `<dt>Último pago</dt><dd>${escapeHtml(formatTimestamp(sub.lastPaymentAt))}</dd>` : ''}
         ${sub.preapprovalId ? `<dt>ID Mercado Pago</dt><dd><code>${escapeHtml(sub.preapprovalId)}</code></dd>` : ''}
         ${typeof sub.recaptchaScore === 'number' ? `<dt>reCAPTCHA</dt><dd>${sub.recaptchaScore.toFixed(2)}</dd>` : ''}
@@ -343,7 +344,7 @@ async function updateAmount(sub) {
   const noteInput = document.getElementById('promo-amount-note');
   const amount = Number(input?.value);
   const note = noteInput?.value?.trim() || '';
-  const current = Number(sub.amount ?? 6499);
+  const current = Number(sub.amount ?? PLAN.amount);
 
   if (!Number.isInteger(amount) || amount < PRICE_MIN || amount > PRICE_MAX) {
     showToast(`El monto debe ser un número entero entre $${PRICE_MIN} y $${PRICE_MAX}.`, 'error');

@@ -1,7 +1,7 @@
 /**
  * PromoPricing.js
  *
- * Tarjeta de precio única y transparente. Aclara qué entra en los $6.499/mes
+ * Tarjeta de precio única y transparente. Aclara qué entra en la cuota mensual
  * y explica el dominio propio como un pago aparte y opcional.
  */
 

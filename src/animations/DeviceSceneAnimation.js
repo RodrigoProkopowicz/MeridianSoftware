@@ -14,7 +14,6 @@
  */
 
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 export function initDeviceSceneAnimation() {
   const scene = document.querySelector('.device-scene');

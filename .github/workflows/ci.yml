@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # El emulador de Firestore corre sobre la JVM.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Tests de las reglas de Firestore contra el emulador (Java arriba).
+      - name: Firestore rules tests
+        run: npm run test:rules
+
+      # Compile gate: valida que el bundle compile. Los deploys reales pasan
+      # por el guard `check:deploy` (predeploy hook), no por CI. Las VITE_*
+      # de acá son dummy solo para que la sustitución no deje placeholders.
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: AIzaSyCI-DUMMY-BUILD-KEY-0000000000000000
+          VITE_FIREBASE_AUTH_DOMAIN: demo-ci.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: demo-ci
+          VITE_FIREBASE_STORAGE_BUCKET: demo-ci.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          VITE_FIREBASE_APP_ID: '1:000000000000:web:cidummy'
+          VITE_FIREBASE_MEASUREMENT_ID: G-CIDUMMY000
+          VITE_RECAPTCHA_SITE_KEY: 6LcCIDUMMYKEY0000000000000000000000000000

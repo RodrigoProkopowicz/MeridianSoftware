@@ -41,7 +41,7 @@ export function hasMinLength(value, min) {
  * @param {string} errorMessage
  * @returns {boolean} - Whether the field is valid
  */
-export function validateField(inputElement, validatorFn, errorMessage) {
+function validateField(inputElement, validatorFn, errorMessage) {
   const value = inputElement.value;
   const isValid = validatorFn(value);
 
@@ -77,15 +77,4 @@ export function validateForm(fields) {
   });
 
   return allValid;
-}
-
-/**
- * Clears all validation errors in a form.
- * @param {HTMLFormElement} form
- */
-export function clearFormErrors(form) {
-  form.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
-  form.querySelectorAll('.input-error-message.visible').forEach(el => {
-    el.classList.remove('visible');
-  });
 }

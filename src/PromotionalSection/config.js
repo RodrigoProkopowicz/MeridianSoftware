@@ -6,12 +6,19 @@
  * la UI. Si cambia el precio, actualizalo también en functions/promotional.
  */
 
+/**
+ * Monto mensual de la suscripción, en pesos. Única fuente del número en el
+ * front: `priceLabel` se deriva de acá, así no hay dos literales que diverjan.
+ * (El cobro real lo define el backend en `functions/promotional/config.js`;
+ * ambos deben coincidir.)
+ */
+const AMOUNT = 6499;
+
 export const PLAN = Object.freeze({
-  /** Monto mensual de la suscripción, en pesos. */
-  amount: 6499,
+  amount: AMOUNT,
   currency: 'ARS',
-  /** Etiqueta legible del precio. */
-  priceLabel: '$6.499',
+  /** Etiqueta legible, derivada de `amount` (separador de miles es-AR). */
+  priceLabel: `$${AMOUNT.toLocaleString('es-AR')}`,
   period: 'por mes',
 });
 
@@ -20,9 +27,6 @@ export const PLAN = Object.freeze({
  * Instante fijo con offset de Argentina (UTC-3): lunes 1/6/2026 03:00 AM ART.
  */
 export const PROMO_DEADLINE = '2026-06-01T03:00:00-03:00';
-
-/** WhatsApp de contacto del vendedor (solo dígitos, con código de país). */
-export const CONTACT_WHATSAPP = '5491100000000';
 
 /** URL del sitio principal — el logo redirige acá. */
 export const MAIN_SITE_URL = '/';

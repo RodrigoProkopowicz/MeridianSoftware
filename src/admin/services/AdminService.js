@@ -7,9 +7,7 @@
 
 import {
   collection,
-  collectionGroup,
   doc,
-  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -204,14 +202,6 @@ export async function deleteUser(uid) {
   return result.data;
 }
 
-/**
- * Convenience: fetches a single user profile by uid (admin-only read).
- */
-export async function getUserProfile(uid) {
-  const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
-}
-
 // ============================================================
 // PromotionalSection — suscripciones (módulo /promo)
 // ============================================================
@@ -280,6 +270,3 @@ export async function deletePromotionalSubscription(id) {
 
 // Re-export for UI consumers that need to format Firestore Timestamps.
 export { Timestamp };
-// `collectionGroup` is exported in case future tabs need it (e.g. all
-// demoAccess docs across users). Not used today.
-export { collectionGroup };

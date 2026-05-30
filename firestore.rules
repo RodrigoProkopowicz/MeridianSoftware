@@ -35,19 +35,19 @@ service cloud.firestore {
       return field is string && field.size() > 0 && field.size() <= maxLen;
     }
 
-    // Super-admin global. Aceptamos dos fuentes de verdad mientras se unifica
-    // el modelo:
-    //   1. Custom claim `auth.token.admin == true` (seteado por la callable
-    //      `setAdminClaim` o por el script grant-first-admin.mjs).
-    //   2. Firestore `users/{uid}.role == 'admin'` (seteado por
-    //      functions/scripts/set-admin-role.mjs).
-    // El custom claim se chequea primero — es gratis. El get() solo corre si
-    // el claim no está, lo que mantiene el costo razonable.
+    // Super-admin global. Fuente de verdad ÚNICA: el custom claim
+    // `auth.token.admin == true` (seteado por la callable `setAdminClaim` o por
+    // el script grant-first-admin.mjs).
+    //
+    // Antes también se aceptaba `users/{uid}.role == 'admin'`; se unificó en el
+    // claim porque el resto del sistema (callables + panel) solo confía en el
+    // claim, así que un admin "role-only" quedaba a medias. ⚠️ ANTES de deployar
+    // esta versión, correr `functions/scripts/migrate-admin-to-claim.mjs` para
+    // otorgarle el claim a cualquier admin que hoy sea solo por role — si no,
+    // pierde el acceso a Firestore. Bonus: sin el get() de antes, isAdmin() ya
+    // no cuesta una lectura por chequeo.
     function isAdmin() {
-      return isSignedIn()
-        && (request.auth.token.admin == true
-            || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     // ---- users/{uid} ----

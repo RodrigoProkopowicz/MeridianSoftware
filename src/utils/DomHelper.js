@@ -6,33 +6,13 @@
  */
 
 /**
- * Selects a single DOM element.
- * @param {string} selector - CSS selector
- * @param {Element} [parent=document] - Parent element to search within
- * @returns {Element|null}
- */
-export function querySelector(selector, parent = document) {
-  return parent.querySelector(selector);
-}
-
-/**
- * Selects all matching DOM elements.
- * @param {string} selector - CSS selector
- * @param {Element} [parent=document] - Parent element to search within
- * @returns {NodeList}
- */
-export function querySelectorAll(selector, parent = document) {
-  return parent.querySelectorAll(selector);
-}
-
-/**
  * Creates an HTML element with optional attributes and children.
  * @param {string} tag - HTML tag name
  * @param {Object} [attributes={}] - Key-value pairs for attributes
  * @param {Array<Element|string>} [children=[]] - Child elements or text
  * @returns {Element}
  */
-export function createElement(tag, attributes = {}, children = []) {
+function createElement(tag, attributes = {}, children = []) {
   const element = document.createElement(tag);
 
   Object.entries(attributes).forEach(([key, value]) => {
@@ -63,15 +43,6 @@ export function createElement(tag, attributes = {}, children = []) {
   });
 
   return element;
-}
-
-/**
- * Sets innerHTML safely on a container element.
- * @param {Element} container - Target container
- * @param {string} html - HTML string to inject
- */
-export function setHTML(container, html) {
-  container.innerHTML = html;
 }
 
 /**

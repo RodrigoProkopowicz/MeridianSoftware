@@ -15,7 +15,6 @@ import {
   signInWithGoogle,
   signInWithApple,
   signOut,
-  getCurrentUser,
   isAuthResolved,
 } from '../../services/AuthenticationService.js';
 import { verifyAdmin } from '../services/AdminService.js';
@@ -228,19 +227,4 @@ function renderAuthError(root, err) {
 function renderAdmin(root, user) {
   root.innerHTML = renderAdminShell(user);
   initAdminShell();
-}
-
-/** Exposed for shell to trigger a re-render after granting/revoking admin on self. */
-export function refreshGate() {
-  const user = getCurrentUser();
-  if (user) {
-    user.getIdToken(true).then(() => {
-      const root = document.getElementById('admin-gate');
-      if (root) {
-        verifyAdmin(user)
-          .then(() => renderAdmin(root, user))
-          .catch(() => renderForbidden(root, user));
-      }
-    });
-  }
 }

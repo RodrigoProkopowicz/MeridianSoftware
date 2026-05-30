@@ -36,7 +36,7 @@ export function normalizePhone(value) {
  * @param {string} value
  * @returns {boolean}
  */
-export function isValidPhone(value) {
+function isValidPhone(value) {
   const digits = normalizePhone(value);
   return digits.length >= 8 && digits.length <= 15;
 }

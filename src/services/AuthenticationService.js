@@ -71,7 +71,16 @@ export async function signInWithApple() {
  * @returns {Promise<void>}
  */
 export async function signOut() {
-  await firebaseSignOut(auth);
+  try {
+    await firebaseSignOut(auth);
+  } catch (err) {
+    // Cerrar sesión es prácticamente infalible (el estado local se limpia igual)
+    // y un fallo no es accionable para el caller. Lo logueamos y NO rechazamos,
+    // así los varios handlers de logout fire-and-forget
+    // (AdminShell, AdminGate, PromoForm, AccountHeader) no generan
+    // unhandled rejections.
+    console.error('AuthenticationService: signOut failed', err);
+  }
 }
 
 /**
