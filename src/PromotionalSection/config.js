@@ -24,9 +24,9 @@ export const PLAN = Object.freeze({
 
 /**
  * Fin de la promoción (precio promocional + cuenta regresiva).
- * Instante fijo con offset de Argentina (UTC-3): lunes 1/6/2026 03:00 AM ART.
+ * Instante fijo con offset de Argentina (UTC-3): sábado 6/6/2026 03:00 AM ART.
  */
-export const PROMO_DEADLINE = '2026-06-01T03:00:00-03:00';
+export const PROMO_DEADLINE = '2026-06-06T03:00:00-03:00';
 
 /** URL del sitio principal — el logo redirige acá. */
 export const MAIN_SITE_URL = '/';
