@@ -17,7 +17,7 @@ import {
 } from '../services/AdminService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp } from '../utils/Format.js';
-import { renderTopbarActions, setTopbarMeta } from './AdminShell.js';
+import { renderTopbarActions, setTopbarMeta, openDetailSheet, closeDetailSheet, detailBackButtonHtml } from './AdminShell.js';
 import { PLAN } from '../../PromotionalSection/config.js';
 
 const PAYMENT_LABELS = {
@@ -147,6 +147,7 @@ function renderList() {
       list.querySelectorAll('tr').forEach(r => r.classList.remove('is-selected'));
       row.classList.add('is-selected');
       renderDetail();
+      openDetailSheet();
     });
   });
 }
@@ -157,11 +158,11 @@ function rowHtml(sub) {
   const work = sub.workStatus || 'no_iniciado';
   return `
     <tr data-sub-id="${escapeHtml(sub.id)}" class="${selected}">
-      <td>${escapeHtml(formatTimestamp(sub.createdAt))}</td>
-      <td>${escapeHtml(sub.businessName || '—')}</td>
-      <td>${escapeHtml(sub.email || sub.phoneRaw || '—')}</td>
-      <td><span class="admin-pill admin-pill--${paymentPill(payment)}">${escapeHtml(PAYMENT_LABELS[payment] || payment)}</span></td>
-      <td><span class="admin-pill admin-pill--${workPill(work)}">${escapeHtml(workLabel(work))}</span></td>
+      <td data-label="Fecha">${escapeHtml(formatTimestamp(sub.createdAt))}</td>
+      <td data-label="Negocio" data-primary>${escapeHtml(sub.businessName || '—')}</td>
+      <td data-label="Contacto">${escapeHtml(sub.email || sub.phoneRaw || '—')}</td>
+      <td data-label="Pago"><span class="admin-pill admin-pill--${paymentPill(payment)}">${escapeHtml(PAYMENT_LABELS[payment] || payment)}</span></td>
+      <td data-label="Trabajo"><span class="admin-pill admin-pill--${workPill(work)}">${escapeHtml(workLabel(work))}</span></td>
     </tr>
   `;
 }
@@ -203,6 +204,7 @@ function renderDetail() {
 
   container.innerHTML = `
     <div class="admin-detail">
+      ${detailBackButtonHtml()}
       <div class="admin-detail__head">
         <span class="admin-pill admin-pill--${paymentPill(payment)}">${escapeHtml(PAYMENT_LABELS[payment] || payment)}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(sub.createdAt))}</span>
@@ -307,6 +309,7 @@ async function deleteSubscription(sub) {
     await deletePromotionalSubscription(sub.id);
     subscriptions = subscriptions.filter(s => s.id !== sub.id);
     if (selectedId === sub.id) selectedId = null;
+    closeDetailSheet();
     renderList();
     renderDetail();
     showToast('Registro eliminado', 'success');

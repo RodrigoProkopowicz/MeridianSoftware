@@ -19,7 +19,7 @@ import {
 import { getCurrentUser } from '../../services/AuthenticationService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp, formatRelative } from '../utils/Format.js';
-import { renderTopbarActions, setTopbarMeta } from './AdminShell.js';
+import { renderTopbarActions, setTopbarMeta, openDetailSheet, closeDetailSheet, detailBackButtonHtml } from './AdminShell.js';
 
 let users = [];
 let filteredUsers = [];
@@ -152,12 +152,14 @@ async function selectUser(uid) {
   if (!detail) return;
   detail.innerHTML = `
     <div class="admin-detail">
+      ${detailBackButtonHtml()}
       <div class="admin-detail__placeholder">
         <span class="admin-spinner admin-spinner--lg"></span>
         <div style="margin-top: 0.5rem;">Cargando usuario…</div>
       </div>
     </div>
   `;
+  openDetailSheet();
   try {
     selectedDemos = await listDemoAccess(uid);
     renderDetail();
@@ -195,6 +197,7 @@ function renderDetail() {
 
   detail.innerHTML = `
     <div class="admin-detail">
+      ${detailBackButtonHtml()}
       <div class="admin-detail__head">
         <span class="admin-detail__title">${name}${isAdmin ? ' <span class="admin-pill admin-pill--active">Admin</span>' : ''}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(user.createdAt))}</span>
@@ -344,6 +347,7 @@ async function removeUser(user) {
     users = users.filter(u => u.uid !== user.uid);
     selectedUid = null;
     selectedDemos = [];
+    closeDetailSheet();
     applyFilter();
     renderList();
     setTopbarMeta(metaText());

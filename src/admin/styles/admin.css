@@ -443,45 +443,114 @@ body {
   gap: var(--space-sm);
 }
 
+/* Account / session control in the topbar.
+   Hidden on desktop (the sidebar owns the user block); shown only in the
+   compact layout where the sidebar becomes a bottom tab bar. */
+.admin-topbar__account { position: relative; display: none; align-items: center; }
+.admin-topbar__account-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+.admin-topbar__account-btn:hover { border-color: var(--color-surface-glass-border); }
+.admin-topbar__account-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.admin-topbar__account-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.admin-topbar__account-avatar--initial {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-accent);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xs);
+}
+.admin-topbar__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 230px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-surface-glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.4rem;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.admin-topbar__menu[hidden] { display: none; }
+.admin-topbar__menu-user {
+  padding: 0.5rem 0.6rem 0.6rem;
+  border-bottom: 1px solid var(--color-surface-glass-border);
+  margin-bottom: 0.25rem;
+}
+.admin-topbar__menu-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-topbar__menu-email {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-topbar__menu-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.admin-topbar__menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.admin-topbar__menu-item:hover {
+  background: rgba(232,220,200,0.05);
+  color: var(--color-text-primary);
+}
+.admin-topbar__menu-item--danger:hover {
+  background: rgba(248,113,113,0.06);
+  color: var(--color-error);
+}
+
+/* Mobile-only "back to list" bar inside the drill-down detail sheet.
+   Hidden on desktop where the master-detail split is always visible. */
+.admin-detail__back { display: none; }
+
+/* Body scroll-lock (mirrors global.css) — needed here because the admin
+   entry doesn't import global.css. Used while the detail sheet is open. */
+body.scroll-locked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 .admin-page {
   flex: 1;
   padding: var(--space-lg) var(--space-xl) var(--space-2xl);
   min-width: 0;
 }
 
-@media (max-width: 880px) {
-  .admin-app { grid-template-columns: 1fr; }
-  .admin-sidebar {
-    position: relative;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    padding: 0.6rem var(--space-md);
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--color-surface-glass-border);
-  }
-  .admin-sidebar__brand {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding: 0.25rem 0.6rem 0.25rem 0;
-    border-right: 1px solid var(--color-surface-glass-border);
-    margin-right: 0.6rem;
-  }
-  .admin-sidebar__section-label,
-  .admin-sidebar__spacer,
-  .admin-sidebar__divider,
-  .admin-sidebar__back,
-  .admin-sidebar__user-info { display: none; }
-  .admin-sidebar__nav { flex-direction: row; gap: 0.25rem; }
-  .admin-sidebar__nav-item { padding: 0.4rem 0.7rem; }
-  .admin-sidebar__user {
-    margin-left: auto;
-    padding: 0;
-  }
-  .admin-topbar { padding: 0.7rem var(--space-md); }
-  .admin-page { padding: var(--space-md) var(--space-md) var(--space-xl); }
-}
+/* Compact layout (≤900px) is handled in one consolidated block near the
+   end of this file — see "Compact / mobile". */
 
 /* ============================================
    Buttons
@@ -1020,10 +1089,237 @@ select.admin-input {
    Responsive nits
    ============================================ */
 
-@media (max-width: 720px) {
-  .admin-table th, .admin-table td { padding: 0.55rem 0.7rem; }
-  .admin-input--search { min-width: 0; flex: 1; }
+/* ============================================
+   Compact / mobile  (phones + small tablets)
+   Sidebar → bottom tab bar · tables → cards ·
+   master-detail → drill-down sheet
+   ============================================ */
+
+@media (max-width: 900px) {
+  /* ---- Shell: single column, sidebar leaves the flow ---- */
+  .admin-app { display: block; }
+  .admin-main { min-height: 100vh; }
+
+  /* ---- Sidebar becomes a fixed bottom tab bar ---- */
+  .admin-sidebar {
+    position: fixed;
+    inset: auto 0 0 0;
+    top: auto;
+    height: auto;
+    width: auto;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #0B1118;
+    border-right: none;
+    border-top: 1px solid var(--color-surface-glass-border);
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.25);
+    z-index: var(--z-sticky);
+  }
+  .admin-sidebar__brand,
+  .admin-sidebar__section-label,
+  .admin-sidebar__spacer,
+  .admin-sidebar__back,
+  .admin-sidebar__divider,
+  .admin-sidebar__user { display: none; }
+
+  .admin-sidebar__nav {
+    flex: 1;
+    flex-direction: row;
+    gap: 0;
+  }
+  .admin-sidebar__nav-item {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.2rem;
+    min-height: 56px;
+    padding: 0.45rem 0.25rem;
+    border-radius: 0;
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+  }
+  .admin-sidebar__nav-item:hover { background: transparent; color: var(--color-text-secondary); }
+  .admin-sidebar__nav-item.is-active {
+    background: transparent;
+    color: var(--color-accent-light);
+    box-shadow: inset 0 2px 0 var(--color-accent);
+  }
+  .admin-sidebar__nav-icon { width: 21px; height: 21px; }
+  .admin-sidebar__nav-label { flex: none; font-size: 0.66rem; letter-spacing: 0; }
+
+  /* ---- Topbar: title + account on row 1, controls wrap to row 2 ---- */
+  .admin-topbar {
+    flex-wrap: wrap;
+    padding: 0.6rem var(--space-md);
+    gap: var(--space-sm);
+  }
+  .admin-topbar__title { order: 1; flex: 1 1 auto; min-width: 0; }
+  .admin-topbar__account { display: flex; order: 2; margin-left: auto; }
+  #admin-topbar-slot {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  #admin-topbar-slot .admin-input--search { flex: 1 1 160px; min-width: 0; }
+  #admin-topbar-slot .admin-field { flex: 1 1 140px; }
+  #admin-topbar-slot select.admin-input { width: 100%; }
+
+  /* ---- Page padding clears the fixed bottom nav ---- */
+  .admin-page {
+    padding: var(--space-md);
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  /* ---- List panel: drop the framed box, let rows be a card stack ---- */
+  .admin-panel,
+  .admin-panel--scroll {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    max-height: none;
+  }
+
+  /* ---- Tables → stacked cards ---- */
+  .admin-table thead { display: none; }
+  .admin-table,
+  .admin-table tbody { display: block; width: 100%; }
+  .admin-table tr {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-surface-glass-border);
+    border-radius: var(--radius-md);
+    padding: 0.7rem 0.85rem;
+    margin-bottom: var(--space-sm);
+  }
+  .admin-table tbody tr:hover { background: var(--color-surface-elevated); }
+  .admin-table tbody tr:active { border-color: rgba(74, 144, 217, 0.5); }
+  .admin-table tbody tr.is-selected {
+    border-color: var(--color-accent);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+    background: rgba(74, 144, 217, 0.08);
+  }
+  .admin-table td,
+  .admin-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    border: none;
+    padding: 0.22rem 0;
+    text-align: right;
+  }
+  .admin-table td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-size: 0.62rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-wide);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  /* Primary cell (name/business) becomes the card title, pinned to the top */
+  .admin-table td[data-primary] {
+    order: -1;
+    justify-content: flex-start;
+    text-align: left;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid var(--color-surface-glass-border);
+  }
+  .admin-table td[data-primary]::before { display: none; }
+  .admin-table tbody tr td:first-child { color: var(--color-text-secondary); }
+
+  /* ---- Users rows: bigger touch target ---- */
+  .admin-user-row { padding: 0.8rem 0.4rem; }
+
+  /* ---- Master-detail → drill-down sheet ----
+     The detail (2nd child of .admin-split) is hidden until a row is tapped,
+     then it slides over as a full-screen sheet. */
+  .admin-split > :last-child { display: none; }
+  .admin-split.is-detail-open > :first-child { display: none; }
+  .admin-split.is-detail-open > :last-child {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    background: var(--color-surface);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
+    animation: admin-sheet-in var(--transition-base);
+  }
+  @keyframes admin-sheet-in {
+    from { transform: translateY(14px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .admin-detail {
+    border: none;
+    border-radius: 0;
+    padding: var(--space-md);
+    min-height: 100%;
+  }
   .admin-detail__list { grid-template-columns: 1fr; gap: 0.1rem var(--space-md); }
-  .admin-detail__list dt { margin-top: 0.5rem; }
-  .admin-detail { padding: var(--space-md); }
+  .admin-detail__list dt { margin-top: 0.6rem; }
+
+  /* Sticky "back to list" bar at the top of the sheet */
+  .admin-detail__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    width: calc(100% + 2 * var(--space-md));
+    margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-md);
+    padding: 0.8rem var(--space-md);
+    background: var(--color-surface);
+    border: none;
+    border-bottom: 1px solid var(--color-surface-glass-border);
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+  .admin-detail__back svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+  }
+  .admin-detail__back:active { color: var(--color-text-primary); }
+
+  /* ---- Touch-friendly controls ---- */
+  .admin-button { min-height: 40px; padding: 0.55rem 0.9rem; }
+  .admin-button--md,
+  .admin-detail__actions .admin-button { min-height: 44px; }
+  /* 16px prevents iOS Safari from zooming the page on input focus */
+  .admin-input,
+  select.admin-input,
+  textarea.admin-input { font-size: 16px; }
+  .admin-input--num { width: 76px; }
+
+  /* ---- Toast sits above the bottom nav ---- */
+  .toast-container {
+    left: var(--space-md);
+    right: var(--space-md);
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .toast { max-width: none; }
+}
+
+/* Very small phones: tighten the detail action buttons so they wrap cleanly */
+@media (max-width: 420px) {
+  .admin-detail__actions { gap: var(--space-xs); }
+  .admin-detail__actions .admin-button { flex: 1 1 auto; }
 }

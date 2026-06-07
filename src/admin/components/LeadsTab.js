@@ -8,7 +8,7 @@
 import { listLeads, updateLead } from '../services/AdminService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp } from '../utils/Format.js';
-import { renderTopbarActions, setTopbarMeta } from './AdminShell.js';
+import { renderTopbarActions, setTopbarMeta, openDetailSheet, detailBackButtonHtml } from './AdminShell.js';
 
 const CONTACT_STATUSES = ['new', 'contacted', 'closed', 'spam'];
 const DEMO_STATUSES = ['pending', 'scheduled', 'done', 'rejected'];
@@ -96,6 +96,7 @@ function renderList() {
       list.querySelectorAll('tr').forEach(r => r.classList.remove('is-selected'));
       row.classList.add('is-selected');
       renderDetail();
+      openDetailSheet();
     });
   });
 }
@@ -113,11 +114,11 @@ function rowHtml(lead) {
   const selected = selectedId === lead.id ? ' is-selected' : '';
   return `
     <tr data-lead-id="${escapeHtml(lead.id)}" class="${selected}">
-      <td>${escapeHtml(date)}</td>
-      <td><span class="admin-pill admin-pill--${lead._type}">${type}</span></td>
-      <td>${name}</td>
-      <td>${contact}</td>
-      <td><span class="admin-pill admin-pill--${status}">${status}</span></td>
+      <td data-label="Fecha">${escapeHtml(date)}</td>
+      <td data-label="Tipo"><span class="admin-pill admin-pill--${lead._type}">${type}</span></td>
+      <td data-label="Nombre" data-primary>${name}</td>
+      <td data-label="Contacto">${contact}</td>
+      <td data-label="Estado"><span class="admin-pill admin-pill--${status}">${status}</span></td>
     </tr>
   `;
 }
@@ -151,6 +152,7 @@ function renderDetail() {
 
   container.innerHTML = `
     <div class="admin-detail">
+      ${detailBackButtonHtml()}
       <div class="admin-detail__head">
         <span class="admin-pill admin-pill--${lead._type}">${isContact ? 'Contacto' : 'Demo'}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(lead.createdAt))}</span>
