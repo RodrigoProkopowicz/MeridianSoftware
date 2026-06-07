@@ -4,13 +4,16 @@
  * Initializes the Firebase app and exports shared service instances.
  * All Firebase configuration is read from environment variables.
  *
- * Bundle strategy: `firebase/app`, `firebase/auth`, and `firebase/firestore`
- * are loaded eagerly because they're needed on first paint (auth listener,
- * form writes). `firebase/analytics` and `firebase/app-check` are dynamic
- * imports — they defer their chunks off the critical path.
+ * Bundle strategy: `firebase/app`, `firebase/auth`, `firebase/firestore` y
+ * `firebase/app-check` cargan eager. App Check DEBE inicializarse ANTES que
+ * auth/firestore: si no, con enforcement activo esos SDKs emiten requests sin
+ * token y fallan — incluida la restauración de sesión en /cuenta y /admin, que
+ * deja de resolver y muestra el gate de login aunque haya sesión.
+ * `firebase/analytics` sí es dynamic import (fuera del critical path).
  */
 
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -46,57 +49,38 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 
-// ---- App Check (deferred) ----
-// Dynamic import keeps the firebase/app-check SDK out of the main bundle.
-// We schedule init off the critical path AND expose `appCheckReady` so any
-// Firestore write that can fire before first paint (e.g. the profile write
-// inside onAuthStateChanged when a session is restored from localStorage)
-// can await it — without that, a write could race past init and reach
-// Firestore without an App Check token.
+// ---- App Check (SYNC, antes de getAuth/getFirestore) ----
+// CRÍTICO: si App Check se inicializa DESPUÉS de auth/firestore, esos SDKs
+// emiten requests SIN token y, con enforcement activo, fallan — incluida la
+// restauración de sesión en /cuenta y /admin, que entonces no resuelve y
+// muestra el gate de login aunque haya sesión válida. Por eso se inicializa
+// sincrónicamente acá, antes de getAuth/getFirestore (mismo patrón que
+// StockManager/Medicus). Antes se difería con requestIdleCallback para sacar el
+// SDK del bundle inicial; ese micro-ahorro causaba el bug.
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-
-let resolveAppCheckReady;
-/**
- * Resolves once App Check finishes initializing — or to `null` if init
- * failed or no reCAPTCHA key is configured. Await this before any write
- * that may run before first paint.
- * @type {Promise<import('firebase/app-check').AppCheck | null>}
- */
-export const appCheckReady = recaptchaSiteKey
-  ? new Promise(resolve => { resolveAppCheckReady = resolve; })
-  : Promise.resolve(null);
-
+let appCheck = null;
 if (recaptchaSiteKey) {
   if (import.meta.env.DEV) {
     // @ts-ignore - Firebase reads this global flag.
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
-  const initAppCheck = () =>
-    import('firebase/app-check')
-      .then(({ initializeAppCheck, ReCaptchaEnterpriseProvider }) => {
-        const appCheck = initializeAppCheck(firebaseApp, {
-          provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
-          isTokenAutoRefreshEnabled: true,
-        });
-        resolveAppCheckReady(appCheck);
-      })
-      .catch(err => {
-        console.warn('FirebaseConfig: App Check init failed —', err.message);
-        resolveAppCheckReady(null);
-      });
-
-  // Prefer `requestIdleCallback` when available. Otherwise (older Safari)
-  // wait for `load` — that's the first moment guaranteed to be past first
-  // paint in every browser. The previous `setTimeout(initAppCheck, 500)`
-  // was an arbitrary delay any consumer could race past.
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(initAppCheck, { timeout: 2000 });
-  } else if (document.readyState === 'complete') {
-    setTimeout(initAppCheck, 0);
-  } else {
-    window.addEventListener('load', () => setTimeout(initAppCheck, 0), { once: true });
+  try {
+    appCheck = initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn('FirebaseConfig: App Check init failed —', err.message);
   }
 }
+
+/**
+ * Resuelve cuando App Check terminó de inicializar (o a `null` si no hay key).
+ * Ahora App Check es síncrono, así que resuelve de inmediato — se mantiene como
+ * Promise por compatibilidad con quienes lo await-ean antes de un write.
+ * @type {Promise<import('firebase/app-check').AppCheck | null>}
+ */
+export const appCheckReady = Promise.resolve(appCheck);
 
 /** Firebase Authentication instance */
 export const auth = getAuth(firebaseApp);
