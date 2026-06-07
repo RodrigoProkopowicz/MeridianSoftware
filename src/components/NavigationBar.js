@@ -63,14 +63,23 @@ export function initNavigationBar() {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const section = link.dataset.section;
-      smoothScrollTo(`#${section}`, 80);
-      
+
+      // Close the mobile menu BEFORE scrolling. While the menu is open the body
+      // is scroll-locked (position:fixed), so a scroll here would be a no-op and
+      // unlocking afterwards snaps back to the saved position — making a menu tap
+      // appear to do nothing. closeMobileMenu() releases the lock first; then the
+      // page is scrollable and smoothScrollTo can actually reach the section.
+      closeMobileMenu();
+
       // Update active state
       document.querySelectorAll('.navigation-bar__link').forEach(l => l.classList.remove('active'));
       document.querySelectorAll(`[data-section="${section}"]`).forEach(l => l.classList.add('active'));
 
-      // Close mobile menu if open
-      closeMobileMenu();
+      // Defer the smooth scroll one frame. closeMobileMenu() may have just
+      // restored the scroll position with an instant scrollTo (the unlock);
+      // starting a smooth scroll in the same tick makes it under-shoot. By the
+      // next frame the page has settled, so it lands precisely on the section.
+      requestAnimationFrame(() => smoothScrollTo(`#${section}`, 80));
     });
   });
 
