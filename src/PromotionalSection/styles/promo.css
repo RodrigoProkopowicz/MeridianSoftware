@@ -604,6 +604,16 @@ body {
   max-height: 100%;
   object-fit: contain;
 }
+/* Fallback cuando el cliente no tiene archivo de logo: wordmark de texto
+   sobre el chip claro (mismo tratamiento visual que un logo oscuro). */
+.promo-clients__wordmark {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: #0f1923;
+  text-align: center;
+  line-height: 1.15;
+}
 .promo-clients__name {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);

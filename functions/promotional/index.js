@@ -41,17 +41,15 @@ const {
 const COLLECTION = 'promotionalSubscriptions';
 
 // ============================================================
-// createPromotionalPreapproval — requiere sesión (cuenta compartida con el sitio)
+// createPromotionalPreapproval — público (sin login)
 // ============================================================
 exports.createPromotionalPreapproval = onCall(
   { secrets: [mpAccessToken], enforceAppCheck: true },
   async (request) => {
-    // El formulario está gateado tras el login: exigimos sesión para crear la
-    // suscripción y la atamos a la cuenta del usuario (la misma del sitio principal).
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Iniciá sesión para continuar.');
-    }
-
+    // El formulario NO está detrás del login: el cliente carga sus datos y esos
+    // datos son los que llegan al panel admin. Sigue protegido por App Check +
+    // reCAPTCHA. Si por casualidad hay sesión, la adjuntamos como referencia
+    // (no es requisito).
     const clean = validateAndClean(request.data || {});
 
     // 1. reCAPTCHA — si hay token y el score es bajo, rechazamos. Si no hay
@@ -73,8 +71,8 @@ exports.createPromotionalPreapproval = onCall(
     const docRef = db.collection(COLLECTION).doc();
     await docRef.set({
       ...clean,
-      userId: request.auth.uid,
-      userEmail: request.auth.token.email || null,
+      userId: request.auth?.uid || null,
+      userEmail: request.auth?.token?.email || null,
       paymentStatus: 'pending',
       workStatus: 'no_iniciado',
       amount: PLAN.amount,
@@ -87,6 +85,9 @@ exports.createPromotionalPreapproval = onCall(
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       lastPaymentAt: null,
+      // Se completan cuando la suscripción se cancela (cliente vía MP o admin).
+      cancelledAt: null,
+      cancelledBy: null,
     });
 
     // 3. Creamos la suscripción en Mercado Pago.
@@ -241,10 +242,17 @@ exports.cancelPromotionalSubscription = onCall(
       }
     }
 
-    await ref.update({
+    const cancelPatch = {
       paymentStatus: 'cancelled',
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    // Registramos quién/ cuándo solo si no estaba ya marcada (si el cliente la
+    // canceló primero vía MP, preservamos ese registro).
+    if (!data.cancelledAt) {
+      cancelPatch.cancelledAt = FieldValue.serverTimestamp();
+      cancelPatch.cancelledBy = 'admin';
+    }
+    await ref.update(cancelPatch);
     return { subscriptionId, paymentStatus: 'cancelled' };
   }
 );
@@ -513,11 +521,25 @@ async function applyPreapprovalUpdate(pre) {
     logger.warn('mercadoPagoWebhook: no subscription doc for preapproval', pre.id);
     return;
   }
-  await ref.update({
-    paymentStatus: normalizeStatus(pre.status),
+  const snap = await ref.get();
+  const prev = snap.data() || {};
+  const nextStatus = normalizeStatus(pre.status);
+
+  const patch = {
+    paymentStatus: nextStatus,
     preapprovalId: pre.id ? String(pre.id) : null,
     updatedAt: FieldValue.serverTimestamp(),
-  });
+  };
+
+  // Primera vez que la suscripción pasa a cancelada: dejamos registro de cuándo
+  // y por quién, para que el admin sepa que tiene que dar de baja la web. Si ya
+  // estaba marcada (p.ej. la canceló el admin), no la pisamos.
+  if (nextStatus === 'cancelled' && !prev.cancelledAt) {
+    patch.cancelledAt = FieldValue.serverTimestamp();
+    patch.cancelledBy = 'cliente';
+  }
+
+  await ref.update(patch);
 }
 
 async function applyAuthorizedPayment(pay) {

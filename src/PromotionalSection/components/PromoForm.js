@@ -10,8 +10,6 @@
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { validateForm, normalizePhone, cleanText } from '../utils/validators.js';
 import { startSubscription } from '../services/checkoutService.js';
-import { onAuthStateChange, signOut } from '../../services/AuthenticationService.js';
-import { openAuthModal } from '../../components/AuthModal.js';
 import { PLAN } from '../config.js';
 
 const BUSINESS_TYPES = [
@@ -48,65 +46,23 @@ export function renderPromoForm() {
   `;
 }
 
-let unsubscribeAuth = null;
-
 export function initPromoForm() {
-  // El formulario está detrás del login: reaccionamos al estado de sesión
-  // (la cuenta es la misma que en el sitio principal) y mostramos el gate de
-  // login o el formulario según corresponda.
-  if (unsubscribeAuth) { unsubscribeAuth(); unsubscribeAuth = null; }
-  unsubscribeAuth = onAuthStateChange((user) => renderFormBody(user));
-}
-
-/** Pinta el gate (sin sesión) o el formulario (con sesión) en el contenedor. */
-function renderFormBody(user) {
+  // Sin login: el formulario se muestra directo. Los datos que carga el cliente
+  // son los que llegan al panel admin (la suscripción ya no se ata a una cuenta).
   const body = document.getElementById('promo-form-body');
   if (!body) return;
-
-  if (!user) {
-    body.innerHTML = gateMarkup();
-    document.getElementById('promo-login-btn')
-      ?.addEventListener('click', () => openAuthModal('promo-form'));
-    return;
-  }
-
-  body.innerHTML = formMarkup(user);
+  body.innerHTML = formMarkup();
   document.getElementById('promo-subscribe-form')
     ?.addEventListener('submit', onSubmit);
-  document.getElementById('promo-switch-account')
-    ?.addEventListener('click', (e) => { e.preventDefault(); signOut(); });
 }
 
-function gateMarkup() {
+function formMarkup() {
   return `
-    <div class="promo-gate">
-      <svg class="promo-gate__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      <h3 class="promo-gate__title">Iniciá sesión para pedir tu web</h3>
-      <p class="promo-gate__text">
-        Usás la misma cuenta del sitio de Meridian. Si ya iniciaste sesión ahí,
-        seguís directo, sin volver a entrar. Es rápido y seguro.
-      </p>
-      <button class="promo-btn promo-btn--primary promo-btn--lg" id="promo-login-btn" type="button">
-        Iniciar sesión para continuar
-      </button>
-    </div>
-  `;
-}
-
-function formMarkup(user) {
-  const email = user.email || '';
-  const who = escapeHtml(user.displayName || user.email || 'tu cuenta');
-  return `
-    <div class="promo-form-who">
-      <span class="promo-form-who__label">Estás como <strong>${who}</strong></span>
-      <button type="button" class="promo-form-who__switch" id="promo-switch-account">Cambiar cuenta</button>
-    </div>
-
     <form class="promo-form" id="promo-subscribe-form" novalidate>
       <div class="promo-form__grid">
         ${textField('businessName', 'Nombre de tu negocio o el tuyo', 'Ej: Panadería La Espiga', { required: true, maxlength: 200 })}
         ${selectField('businessType', 'Rubro', BUSINESS_TYPES, { required: true })}
-        ${textField('email', 'Email', 'tunombre@email.com', { required: true, type: 'email', maxlength: 200, value: email })}
+        ${textField('email', 'Email', 'tunombre@email.com', { required: true, type: 'email', maxlength: 200 })}
         ${textField('phone', 'WhatsApp / Teléfono', 'Ej: 11 1234-5678', { required: true, type: 'tel', maxlength: 30 })}
       </div>
 

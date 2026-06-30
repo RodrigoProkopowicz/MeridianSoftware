@@ -26,7 +26,7 @@ const PROMO_BASE_URL = 'https://www.meridian-software.com';
 
 /** Plan promocional. Fuente de verdad del monto INICIAL que se cobra. */
 const PLAN = Object.freeze({
-  amount: 6499,
+  amount: 34999,
   currency: 'ARS',
   frequency: 1,
   frequencyType: 'months',

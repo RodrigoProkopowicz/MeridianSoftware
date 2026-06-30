@@ -919,6 +919,26 @@ body.scroll-locked {
   line-height: 1.55;
 }
 
+/* Aviso de cancelación: destaca cuándo y quién canceló, para que el admin sepa
+   que tiene que dar de baja la web. Variante --client (la canceló el cliente)
+   en rojo; default (la cancelaste vos) más neutra. */
+.promo-cancel-notice {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(251,191,36,0.4);
+  background: rgba(251,191,36,0.08);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.promo-cancel-notice--client {
+  border-color: rgba(248,113,113,0.45);
+  background: rgba(248,113,113,0.10);
+  color: var(--color-error);
+}
+.promo-cancel-notice strong { font-weight: var(--font-weight-semibold); }
+
 /* ============================================
    Form fields
    ============================================ */

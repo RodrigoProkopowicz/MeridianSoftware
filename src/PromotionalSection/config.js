@@ -12,7 +12,7 @@
  * (El cobro real lo define el backend en `functions/promotional/config.js`;
  * ambos deben coincidir.)
  */
-const AMOUNT = 6499;
+const AMOUNT = 34999;
 
 export const PLAN = Object.freeze({
   amount: AMOUNT,

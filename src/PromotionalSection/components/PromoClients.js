@@ -19,6 +19,19 @@ const CLIENTS = [
     domain: 'pomilioseguros.com.ar',
     logo: '/clients/pomilio-seguros.svg',
   },
+  {
+    name: 'Serafino Coffee',
+    url: 'https://serafinocoffee.com',
+    domain: 'serafinocoffee.com',
+    // Sin archivo de logo: caemos a un wordmark de texto dentro del chip.
+    wordmark: 'Serafino Coffee',
+  },
+  {
+    name: 'Florecer Piel',
+    url: 'https://florecerpiel.web.app',
+    domain: 'florecerpiel.web.app',
+    wordmark: 'Florecer Piel',
+  },
 ];
 
 export function renderPromoClients() {
@@ -37,7 +50,9 @@ export function renderPromoClients() {
             <a class="promo-clients__card" href="${c.url}" target="_blank" rel="noopener noreferrer"
                aria-label="Visitar ${c.name} (se abre en una pestaña nueva)">
               <div class="promo-clients__chip">
-                <img class="promo-clients__logo" src="${c.logo}" alt="${c.name}" loading="lazy" />
+                ${c.logo
+                  ? `<img class="promo-clients__logo" src="${c.logo}" alt="${c.name}" loading="lazy" />`
+                  : `<span class="promo-clients__wordmark">${c.wordmark || c.name}</span>`}
               </div>
               <span class="promo-clients__name">${c.name}</span>
               <span class="promo-clients__link">

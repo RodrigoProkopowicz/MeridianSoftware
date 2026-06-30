@@ -32,7 +32,14 @@ const WORK_STATUSES = [
   { value: 'no_iniciado', label: 'No iniciado' },
   { value: 'en_progreso', label: 'En progreso' },
   { value: 'entregado', label: 'Entregado' },
+  { value: 'dado_de_baja', label: 'Dado de baja' },
 ];
+
+/** Quién canceló la suscripción (campo `cancelledBy` del backend). */
+const CANCELLED_BY_LABELS = {
+  cliente: 'el cliente (desde Mercado Pago)',
+  admin: 'vos, desde el panel',
+};
 
 const PAYMENT_FILTERS = [
   { value: 'all', label: 'Todas' },
@@ -212,6 +219,8 @@ function renderDetail() {
 
       <h2 class="admin-detail__name">${escapeHtml(sub.businessName || '—')}</h2>
 
+      ${cancelNoticeHtml(sub)}
+
       <div class="admin-detail__actions admin-detail__actions--contact">
         ${waLink ? `<a class="admin-button admin-button--primary" href="${waLink}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
         ${mailLink ? `<a class="admin-button" href="${mailLink}">Email</a>` : ''}
@@ -229,6 +238,7 @@ function renderDetail() {
         ${sub.stylePreferences ? `<dt>Estilo / colores</dt><dd>${escapeHtml(sub.stylePreferences)}</dd>` : ''}
         <dt>Cuota</dt><dd>$${escapeHtml(String(sub.amount ?? PLAN.amount))} ${escapeHtml(sub.currency || 'ARS')} / mes</dd>
         ${sub.lastPaymentAt ? `<dt>Último pago</dt><dd>${escapeHtml(formatTimestamp(sub.lastPaymentAt))}</dd>` : ''}
+        ${sub.cancelledAt ? `<dt>Cancelada</dt><dd>${escapeHtml(formatTimestamp(sub.cancelledAt))}${sub.cancelledBy ? ` · ${escapeHtml(cancelledByLabel(sub.cancelledBy))}` : ''}</dd>` : ''}
         ${sub.preapprovalId ? `<dt>ID Mercado Pago</dt><dd><code>${escapeHtml(sub.preapprovalId)}</code></dd>` : ''}
         ${typeof sub.recaptchaScore === 'number' ? `<dt>reCAPTCHA</dt><dd>${sub.recaptchaScore.toFixed(2)}</dd>` : ''}
       </dl>
@@ -395,11 +405,32 @@ function workPill(status) {
     no_iniciado: 'off',
     en_progreso: 'new',
     entregado: 'active',
+    dado_de_baja: 'rejected',
   }[status] || 'plain';
 }
 
 function workLabel(status) {
   return WORK_STATUSES.find(s => s.value === status)?.label || status;
+}
+
+function cancelledByLabel(by) {
+  return CANCELLED_BY_LABELS[by] || by;
+}
+
+/**
+ * Aviso de cancelación. Si la canceló el cliente (desde Mercado Pago), lo
+ * resaltamos en rojo para que el admin sepa que tiene que dar de baja la web.
+ * Si la cancelaste vos desde el panel, un aviso más neutro.
+ */
+function cancelNoticeHtml(sub) {
+  if ((sub.paymentStatus || 'pending') !== 'cancelled') return '';
+  const byClient = sub.cancelledBy === 'cliente';
+  const when = sub.cancelledAt ? formatTimestamp(sub.cancelledAt) : null;
+  const whenTxt = when ? ` el <strong>${escapeHtml(when)}</strong>` : '';
+  const msg = byClient
+    ? `El cliente canceló la suscripción${whenTxt}. Dale de baja la web y marcá el trabajo como “Dado de baja”.`
+    : `Suscripción cancelada${whenTxt}${sub.cancelledBy ? ` por ${escapeHtml(cancelledByLabel(sub.cancelledBy))}` : ''}. El cobro automático en Mercado Pago está cortado.`;
+  return `<div class="promo-cancel-notice${byClient ? ' promo-cancel-notice--client' : ''}">${msg}</div>`;
 }
 
 /** Historial de ajustes de precio (últimos 5, más reciente primero). */

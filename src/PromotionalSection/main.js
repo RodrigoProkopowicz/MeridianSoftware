@@ -9,11 +9,8 @@
 
 import '../styles/variables.css';
 import '../styles/reset.css';
-import '../styles/auth.css';
 import './styles/promo.css';
 
-import { initializeAuthListener } from '../services/AuthenticationService.js';
-import { renderAuthModal, initAuthModal } from '../components/AuthModal.js';
 import { renderPromoHeader, initPromoHeader } from './components/PromoHeader.js';
 import { renderPromoHero } from './components/PromoHero.js';
 import { renderPromoCountdown, initPromoCountdown } from './components/PromoCountdown.js';
@@ -67,11 +64,8 @@ function boot() {
       ${renderPromoForm()}
     </main>
     ${renderPromoFooter()}
-    ${renderAuthModal()}
   `;
 
-  initializeAuthListener();
-  initAuthModal();
   initPromoHeader();
   initPromoCountdown();
   initPromoForm();
