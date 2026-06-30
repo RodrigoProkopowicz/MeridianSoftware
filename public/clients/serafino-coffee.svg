@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Marca Serafino: grano alado + estrella (mismas formas que Logo.jsx) sobre tinta. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7e8c4"/>
+      <stop offset="38%" stop-color="#dcb265"/>
+      <stop offset="56%" stop-color="#c89a4a"/>
+      <stop offset="100%" stop-color="#a3742c"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#160d08"/>
+  <g transform="translate(-3.2,-2.2) scale(0.32)">
+    <path d="M60 19 L62.6 28.8 L72.4 31.4 L62.6 34 L60 43.8 L57.4 34 L47.6 31.4 L57.4 28.8 Z" fill="url(#g)"/>
+    <g fill="url(#g)">
+      <path d="M60 57 Q77 44 96 45 Q78 54 60 61 Z"/>
+      <path d="M59 61 Q73 51 90 54 Q74 60 59 64 Z"/>
+      <path d="M58 65 Q69 57 83 61 Q71 65 58 67 Z"/>
+      <g transform="translate(120,0) scale(-1,1)">
+        <path d="M60 57 Q77 44 96 45 Q78 54 60 61 Z"/>
+        <path d="M59 61 Q73 51 90 54 Q74 60 59 64 Z"/>
+        <path d="M58 65 Q69 57 83 61 Q71 65 58 67 Z"/>
+      </g>
+    </g>
+    <ellipse cx="60" cy="77" rx="13.5" ry="20" fill="url(#g)"/>
+    <path d="M60 58 C53 66 53 70 60 77 C67 84 67 88 60 95" fill="none" stroke="#160d08" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg>

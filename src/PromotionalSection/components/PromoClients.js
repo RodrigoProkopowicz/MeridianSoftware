@@ -23,14 +23,13 @@ const CLIENTS = [
     name: 'Serafino Coffee',
     url: 'https://serafinocoffee.com',
     domain: 'serafinocoffee.com',
-    // Sin archivo de logo: caemos a un wordmark de texto dentro del chip.
-    wordmark: 'Serafino Coffee',
+    logo: '/clients/serafino-coffee.svg',
   },
   {
     name: 'Florecer Piel',
     url: 'https://florecerpiel.web.app',
     domain: 'florecerpiel.web.app',
-    wordmark: 'Florecer Piel',
+    logo: '/clients/florecer-piel.svg',
   },
 ];
 
