@@ -13,7 +13,6 @@ import './styles/promo.css';
 
 import { renderPromoHeader, initPromoHeader } from './components/PromoHeader.js';
 import { renderPromoHero } from './components/PromoHero.js';
-import { renderPromoCountdown, initPromoCountdown } from './components/PromoCountdown.js';
 import { renderPromoTrustBar } from './components/PromoTrustBar.js';
 import { renderPromoFeatures } from './components/PromoFeatures.js';
 import { renderPromoClients } from './components/PromoClients.js';
@@ -55,7 +54,6 @@ function boot() {
     ${renderPromoHeader()}
     <main>
       ${renderPromoHero()}
-      ${renderPromoCountdown()}
       ${renderPromoTrustBar()}
       ${renderPromoFeatures()}
       ${renderPromoClients()}
@@ -67,7 +65,6 @@ function boot() {
   `;
 
   initPromoHeader();
-  initPromoCountdown();
   initPromoForm();
 }
 

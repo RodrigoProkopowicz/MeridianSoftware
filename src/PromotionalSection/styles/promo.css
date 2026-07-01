@@ -242,61 +242,6 @@ body {
   max-width: 52ch;
 }
 
-/* ---- Cuenta regresiva ---- */
-.promo-countdown { padding-block: var(--space-lg); }
-.promo-countdown__inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-  max-width: 620px;
-  margin: 0 auto;
-  padding: var(--space-lg) var(--space-xl);
-  text-align: center;
-  background: rgba(74, 144, 217, 0.08);
-  border: 1.5px solid rgba(74, 144, 217, 0.32);
-  border-radius: var(--radius-lg);
-}
-.promo-countdown__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-accent);
-}
-.promo-countdown__label svg { width: 18px; height: 18px; }
-.promo-countdown__timer { display: flex; align-items: flex-start; gap: var(--space-sm); }
-.promo-countdown__unit { display: flex; flex-direction: column; align-items: center; min-width: 62px; }
-.promo-countdown__num {
-  font-size: 46px;
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  color: var(--color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.promo-countdown__cap {
-  margin-top: 7px;
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--color-text-muted);
-}
-.promo-countdown__sep {
-  font-size: 40px;
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  color: rgba(74, 144, 217, 0.5);
-}
-.promo-countdown__ended {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
 /* ---- Trust bar ---- */
 .promo-trust {
   padding-block: var(--space-2xl);
