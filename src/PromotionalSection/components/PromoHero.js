@@ -10,7 +10,7 @@ export function renderPromoHero() {
   return `
     <section class="promo-hero">
       <div class="promo-container promo-hero__inner">
-        <span class="promo-badge">Para vecinos de San Miguel</span>
+        <span class="promo-badge">Para negocios o emprendimientos</span>
 
         <h1 class="promo-hero__title">
           Tu negocio con una web profesional,

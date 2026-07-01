@@ -31,7 +31,7 @@ export function renderPromoPricing() {
         <div class="promo-pricing__card">
           <div class="promo-pricing__header">
             <span class="promo-pricing__badge">Precio promocional</span>
-            <span class="promo-pricing__plan">Plan Vecino</span>
+            <span class="promo-pricing__plan">Plan Web</span>
             <div class="promo-pricing__amount">
               <span class="promo-pricing__price">${PLAN.priceLabel}</span>
               <span class="promo-pricing__period">${PLAN.period}</span>
