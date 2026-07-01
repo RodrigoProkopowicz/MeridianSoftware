@@ -95,87 +95,38 @@
   margin-bottom: var(--space-2xl);
 }
 
-.auth-modal__buttons {
+.auth-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
 }
 
-.auth-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
+.auth-form__submit {
   width: 100%;
-  padding: 0.9rem var(--space-xl);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: all var(--transition-base);
-  border: 1px solid transparent;
+  margin-top: var(--space-sm);
 }
 
-.auth-button__icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.auth-button--google {
-  background: #fff;
-  color: #3c4043;
-}
-
-.auth-button--google:hover {
-  background: #f1f3f4;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.auth-button--apple {
-  background: #000;
-  color: #fff;
-}
-
-.auth-button--apple:hover {
-  background: #1a1a1a;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.auth-button__label {
+.auth-form__submit .spinner {
   display: inline-block;
+  vertical-align: -2px;
+  margin-right: 0.4rem;
 }
 
-.auth-button.loading {
-  pointer-events: none;
-  position: relative;
-  color: transparent;
+.auth-form__forgot {
+  align-self: center;
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color var(--transition-fast);
 }
 
-.auth-button.loading .auth-button__icon,
-.auth-button.loading .auth-button__label {
-  opacity: 0.2;
-}
-
-.auth-button.loading::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  margin: -10px 0 0 -10px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-.auth-button--apple.loading::after {
-  border-color: rgba(255, 255, 255, 0.2);
-  border-top-color: #fff;
+.auth-form__forgot:hover {
+  color: var(--color-text-primary);
 }
 
 .auth-modal__terms {

@@ -12,8 +12,8 @@
 
 import {
   onAuthStateChange,
-  signInWithGoogle,
-  signInWithApple,
+  signInWithEmailPassword,
+  sendPasswordReset,
   signOut,
   isAuthResolved,
 } from '../../services/AuthenticationService.js';
@@ -103,16 +103,26 @@ function authShell({ rightHtml }) {
 function renderAuth(root, opts = {}) {
   const { showButtons = true, status = null } = opts;
   const statusHtml = status ? statusLine(status) : '';
-  const buttonsHtml = showButtons
+  const formHtml = showButtons
     ? `
-      <div class="admin-auth__actions">
-        <button class="admin-button admin-button--google" id="admin-google-button" type="button">
-          Continuar con Google
+      <form class="admin-auth__actions" id="admin-signin-form" novalidate>
+        <label class="admin-field">
+          <span class="admin-field__label">Email</span>
+          <input class="admin-input" id="admin-email" type="email" name="email"
+                 placeholder="tu@email.com" autocomplete="email" required />
+        </label>
+        <label class="admin-field">
+          <span class="admin-field__label">Contraseña</span>
+          <input class="admin-input" id="admin-password" type="password" name="password"
+                 placeholder="Tu contraseña" autocomplete="current-password" required />
+        </label>
+        <button class="admin-button admin-button--primary" id="admin-signin-button" type="submit">
+          Iniciar sesión
         </button>
-        <button class="admin-button admin-button--apple" id="admin-apple-button" type="button">
-          Continuar con Apple
+        <button class="admin-auth__link" id="admin-forgot-button" type="button">
+          ¿Olvidaste tu contraseña?
         </button>
-      </div>
+      </form>
       <a class="admin-auth__back" href="/">Volver al sitio</a>
     `
     : '';
@@ -128,16 +138,16 @@ function renderAuth(root, opts = {}) {
           <p class="admin-auth__subtitle">${subtitle}</p>
         </div>
         ${statusHtml}
-        ${buttonsHtml}
+        ${formHtml}
       </div>
     `,
   });
 
   if (showButtons) {
-    const googleBtn = document.getElementById('admin-google-button');
-    const appleBtn = document.getElementById('admin-apple-button');
-    if (googleBtn) googleBtn.addEventListener('click', () => runSignIn(googleBtn, signInWithGoogle));
-    if (appleBtn) appleBtn.addEventListener('click', () => runSignIn(appleBtn, signInWithApple));
+    const form = document.getElementById('admin-signin-form');
+    const forgotBtn = document.getElementById('admin-forgot-button');
+    if (form) form.addEventListener('submit', handleSignIn);
+    if (forgotBtn) forgotBtn.addEventListener('click', handleForgot);
   }
 }
 
@@ -153,19 +163,57 @@ function statusLine({ kind, label }) {
   return `<div class="${className}">${left}<span>${escapeHtml(label)}</span></div>`;
 }
 
-async function runSignIn(button, signInFn) {
-  button.disabled = true;
-  const original = button.textContent;
-  button.textContent = 'Iniciando sesión…';
+function signInErrorMessage(err) {
+  switch (err && err.code) {
+    case 'auth/invalid-email':
+      return 'El email no es válido.';
+    case 'auth/user-disabled':
+      return 'Esta cuenta está deshabilitada.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Email o contraseña incorrectos.';
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos. Probá de nuevo en unos minutos.';
+    default:
+      return 'No pudimos iniciar sesión. Probá de nuevo.';
+  }
+}
+
+async function handleSignIn(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById('admin-email');
+  const passwordInput = document.getElementById('admin-password');
+  const button = document.getElementById('admin-signin-button');
+  const email = (emailInput?.value || '').trim();
+  const password = passwordInput?.value || '';
+  if (!email || !password) {
+    showToast('Completá email y contraseña.', 'error');
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = 'Iniciando sesión…'; }
   try {
-    await signInFn();
+    await signInWithEmailPassword(email, password);
   } catch (err) {
     console.error('AdminGate: sign-in failed', err);
-    if (err && err.code !== 'auth/popup-closed-by-user') {
-      showToast('No pudimos iniciar sesión. Probá de nuevo.', 'error');
-    }
-    button.disabled = false;
-    button.textContent = original;
+    showToast(signInErrorMessage(err), 'error');
+    if (button) { button.disabled = false; button.textContent = 'Iniciar sesión'; }
+  }
+}
+
+async function handleForgot() {
+  const emailInput = document.getElementById('admin-email');
+  let email = (emailInput?.value || '').trim();
+  if (!email) {
+    email = (window.prompt('Ingresá tu email para restablecer la contraseña:') || '').trim();
+  }
+  if (!email) return;
+  try {
+    await sendPasswordReset(email);
+    showToast('Te enviamos un email para restablecer la contraseña.', 'success', 5000);
+  } catch (err) {
+    console.error('AdminGate: password reset failed', err);
+    showToast('Si el email está registrado, vas a recibir un enlace.', 'success', 5000);
   }
 }
 

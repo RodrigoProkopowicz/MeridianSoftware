@@ -5,22 +5,15 @@
  *   - Stock Manager  →  /stock-manager
  *   - Medicus        →  /medicus
  *
- * Both ship with a self-service 7-day demo. The user signs in, clicks
- * "Activar demo de 7 días", and we write users/{uid}/demoAccess/{productId}
- * with an expiresAt 7 days out. Each product checks that doc on login and
- * refuses access once expired.
+ * The free trial is request-based: clicking "Solicitar prueba gratuita" scrolls
+ * to the public request form (#demo) with the product pre-selected. An admin
+ * then creates the account and grants the demo from the panel.
  */
 
-import { getCurrentUser, onAuthStateChange } from '../services/AuthenticationService.js';
-import {
-  activateDemoAccess,
-  getDemoAccess,
-  daysRemaining,
-  DEMO_PRODUCTS,
-} from '../services/DemoAccessService.js';
+import { DEMO_PRODUCTS } from '../services/DemoAccessService.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
-import { showToast } from '../utils/DomHelper.js';
+import { smoothScrollTo } from '../utils/DomHelper.js';
 
 const PRODUCTS = [
   {
@@ -115,13 +108,11 @@ function renderProductCard(p) {
         ${featuresHTML}
       </ul>
 
-      <div class="product-card__status" data-product-status="${p.id}" aria-live="polite"></div>
-
       <div class="product-card__actions">
         <button class="button-primary product-card__cta"
                 data-product-cta="${p.id}"
                 data-product-path="${p.path}">
-          Activar demo de 7 días
+          Solicitar prueba gratuita
         </button>
       </div>
     </article>
@@ -129,144 +120,20 @@ function renderProductCard(p) {
 }
 
 /**
- * Initializes product card buttons and refreshes their state when auth
- * resolves (so we can show "Demo activa — quedan X días" or "Demo expirada"
- * before the user clicks anything).
- * @param {Function} openAuthModal
+ * Wires each product CTA to scroll to the public request form (#demo) with the
+ * matching product pre-selected in the solution dropdown.
  */
-export function initProductsSection(openAuthModal) {
-  const buttons = document.querySelectorAll('[data-product-cta]');
-
-  buttons.forEach(button => {
-    button.addEventListener('click', async () => {
+export function initProductsSection() {
+  document.querySelectorAll('[data-product-cta]').forEach(button => {
+    button.addEventListener('click', () => {
       const productId = button.dataset.productCta;
-      const path = button.dataset.productPath;
-      const user = getCurrentUser();
-
-      if (!user) {
-        openAuthModal('product_card');
-        return;
-      }
-
-      await handleActivateOrEnter(button, productId, path, user.uid);
+      trackEvent(AnalyticsEvent.SOLUTION_DEMO_CLICKED, { solution_id: productId });
+      smoothScrollTo('#demo', 80);
+      // Pre-select the product once the smooth scroll has settled.
+      setTimeout(() => {
+        const select = document.getElementById('demo-solution-select');
+        if (select) select.value = productId;
+      }, 600);
     });
   });
-
-  // Reflect demo status on the card whenever auth state changes.
-  onAuthStateChange(async (user) => {
-    if (!user) {
-      // Logged out — reset every card to its default CTA.
-      PRODUCTS.forEach(p => updateCardState(p.id, null));
-      return;
-    }
-    // Fetch each product's demoAccess doc in parallel.
-    await Promise.all(
-      PRODUCTS.map(async (p) => {
-        try {
-          const access = await getDemoAccess(user.uid, p.id);
-          updateCardState(p.id, access);
-        } catch (err) {
-          console.warn(`ProductsSection: failed to read demoAccess/${p.id}`, err.message);
-        }
-      })
-    );
-  });
-}
-
-/**
- * Reflects the demo state on a product card: tweaks the button label,
- * shows the status pill ("Quedan X días" / "Demo expirada"), and stores
- * the path the button should open when clicked.
- * @param {string} productId
- * @param {{ expired: boolean, expiresAtMs: number }|null} access
- */
-function updateCardState(productId, access) {
-  const button = document.querySelector(`[data-product-cta="${productId}"]`);
-  const statusEl = document.querySelector(`[data-product-status="${productId}"]`);
-  if (!button || !statusEl) return;
-
-  if (!access) {
-    button.textContent = 'Activar demo de 7 días';
-    button.dataset.productMode = 'activate';
-    statusEl.innerHTML = '';
-    statusEl.className = 'product-card__status';
-    return;
-  }
-
-  if (access.expired) {
-    button.textContent = 'Demo expirada — Contactanos';
-    button.dataset.productMode = 'expired';
-    statusEl.innerHTML = `
-      <span class="product-card__status-pill product-card__status-pill--expired">
-        Demo expirada · contactanos para extender
-      </span>
-    `;
-    statusEl.className = 'product-card__status';
-    return;
-  }
-
-  const days = daysRemaining(access.expiresAtMs);
-  button.textContent = days <= 1 ? 'Ingresar (último día)' : 'Ingresar al producto';
-  button.dataset.productMode = 'enter';
-  statusEl.innerHTML = `
-    <span class="product-card__status-pill product-card__status-pill--active">
-      Demo activa · ${days} día${days === 1 ? '' : 's'} restante${days === 1 ? '' : 's'}
-    </span>
-  `;
-  statusEl.className = 'product-card__status';
-}
-
-/**
- * Decides whether to activate a fresh demo, redirect into a running demo,
- * or surface the expired/contact path. Updates the card state in place.
- */
-async function handleActivateOrEnter(button, productId, path, uid) {
-  const previousLabel = button.textContent;
-  button.disabled = true;
-  button.innerHTML = '<div class="spinner"></div> Procesando...';
-
-  try {
-    const access = await getDemoAccess(uid, productId);
-
-    if (access && !access.expired) {
-      window.location.href = path;
-      return;
-    }
-
-    if (access && access.expired) {
-      showToast(
-        'Tu demo de 7 días expiró. Escribinos en la sección Contacto para extenderla.',
-        'error',
-        7000,
-      );
-      // Smooth scroll to contact form so the user has a clear next step.
-      const contact = document.getElementById('contact');
-      if (contact) contact.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-
-    // Fresh activation.
-    const { expiresAtMs } = await activateDemoAccess(uid, productId);
-    trackEvent(AnalyticsEvent.PRODUCT_DEMO_ACTIVATED, { product_id: productId });
-    updateCardState(productId, { expiresAtMs, expired: false });
-    showToast(
-      `Demo de ${productLabel(productId)} activada por 7 días. ¡Disfrutala!`,
-      'success',
-      5000,
-    );
-    // Small delay so the user sees the success toast before redirecting.
-    setTimeout(() => { window.location.href = path; }, 900);
-  } catch (err) {
-    console.error('ProductsSection: activation failed', err);
-    showToast('No pudimos activar la demo. Probá de nuevo en unos segundos.', 'error');
-    button.textContent = previousLabel;
-  } finally {
-    button.disabled = false;
-  }
-}
-
-function productLabel(productId) {
-  if (productId === DEMO_PRODUCTS.STOCK_MANAGER) return 'Stock Manager';
-  if (productId === DEMO_PRODUCTS.MEDICUS) return 'Medicus';
-  return productId;
 }

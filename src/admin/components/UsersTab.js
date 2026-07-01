@@ -20,6 +20,7 @@ import { getCurrentUser } from '../../services/AuthenticationService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp, formatRelative } from '../utils/Format.js';
 import { renderTopbarActions, setTopbarMeta, openDetailSheet, closeDetailSheet, detailBackButtonHtml } from './AdminShell.js';
+import { openCreateUserModal } from './CreateUserModal.js';
 
 let users = [];
 let filteredUsers = [];
@@ -45,6 +46,7 @@ export function initUsersTab() {
     slot.innerHTML = `
       <input class="admin-input admin-input--search" id="users-search"
              type="search" placeholder="Buscar por nombre o email…" autocomplete="off" />
+      <button class="admin-button admin-button--primary" id="users-create" type="button">Crear usuario</button>
       <button class="admin-button" id="users-refresh" type="button">Actualizar</button>
     `;
     const search = slot.querySelector('#users-search');
@@ -57,6 +59,9 @@ export function initUsersTab() {
         setTopbarMeta(metaText());
       });
     }
+    slot.querySelector('#users-create')?.addEventListener('click', () => {
+      openCreateUserModal({ onCreated: () => loadUsers() });
+    });
     slot.querySelector('#users-refresh')?.addEventListener('click', loadUsers);
   });
   loadUsers();

@@ -1,29 +1,18 @@
 /**
  * AuthModal.js
  *
- * Full-screen auth modal with Google and Apple sign-in buttons.
- * Glassmorphism overlay with entrance animation.
+ * Full-screen sign-in modal (email + password). Accounts are created by an
+ * admin from the panel — there is no self-service registration here, only
+ * sign-in and password reset. Glassmorphism overlay with entrance animation.
  */
 
-import { signInWithGoogle, signInWithApple } from '../services/AuthenticationService.js';
+import { signInWithEmailPassword, sendPasswordReset } from '../services/AuthenticationService.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
 import { executeRecaptcha } from '../services/RecaptchaService.js';
 import { RecaptchaAction } from '../services/RecaptchaActions.js';
+import { isValidEmail } from '../utils/ValidationHelper.js';
 import { showToast, lockBodyScroll, unlockBodyScroll } from '../utils/DomHelper.js';
-
-const GOOGLE_ICON_SVG = `
-  <svg class="auth-button__icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-  </svg>`;
-
-const APPLE_ICON_SVG = `
-  <svg class="auth-button__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-  </svg>`;
 
 /**
  * Renders the auth modal HTML.
@@ -37,20 +26,32 @@ export function renderAuthModal() {
         <button class="auth-modal__close" id="auth-modal-close" aria-label="Cerrar">✕</button>
 
         <img src="/logo.png" alt="Meridian Software" class="auth-modal__logo" decoding="async" loading="lazy" />
-        <h2 class="auth-modal__title" id="auth-modal-title">Bienvenido</h2>
-        <p class="auth-modal__subtitle">Iniciá sesión para acceder a demos y funciones personalizadas</p>
+        <h2 class="auth-modal__title" id="auth-modal-title">Ingresá a tu cuenta</h2>
+        <p class="auth-modal__subtitle">Usá el email y la contraseña que te dimos. Las cuentas las crea el equipo de Meridian.</p>
 
-        <div class="auth-modal__buttons">
-          <button class="auth-button auth-button--google" id="auth-google-button" type="button">
-            ${GOOGLE_ICON_SVG}
-            <span class="auth-button__label">Continuar con Google</span>
+        <form class="auth-form" id="auth-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="auth-email">Email</label>
+            <input type="email" class="input-field" id="auth-email" name="email"
+                   placeholder="tu@email.com" autocomplete="email" required />
+            <span class="input-error-message">Ingresá un email válido</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="auth-password">Contraseña</label>
+            <input type="password" class="input-field" id="auth-password" name="password"
+                   placeholder="Tu contraseña" autocomplete="current-password" required />
+            <span class="input-error-message">Ingresá tu contraseña</span>
+          </div>
+
+          <button type="submit" class="button-primary auth-form__submit" id="auth-submit">
+            Iniciar sesión
           </button>
 
-          <button class="auth-button auth-button--apple" id="auth-apple-button" type="button">
-            ${APPLE_ICON_SVG}
-            <span class="auth-button__label">Continuar con Apple</span>
+          <button type="button" class="auth-form__forgot" id="auth-forgot">
+            ¿Olvidaste tu contraseña?
           </button>
-        </div>
+        </form>
 
         <p class="auth-modal__terms">
           Al continuar, aceptás nuestros
@@ -76,9 +77,9 @@ export function openAuthModal(source = 'unknown') {
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   lockBodyScroll();
-  // Focus the close button so keyboard users have a sensible first focus.
-  const closeBtn = document.getElementById('auth-modal-close');
-  if (closeBtn) closeBtn.focus();
+  // Focus the email field so keyboard users can start typing right away.
+  const emailInput = document.getElementById('auth-email');
+  if (emailInput) emailInput.focus();
   trackEvent(AnalyticsEvent.AUTH_MODAL_OPENED, { source });
 }
 
@@ -99,41 +100,103 @@ export function closeAuthModal() {
 }
 
 /**
- * Toggles loading state on an auth button without destroying its icon/label.
+ * Toggles loading state on the submit button.
  * @param {HTMLButtonElement} button
  * @param {boolean} loading
  */
-function setAuthButtonLoading(button, loading) {
+function setSubmitLoading(button, loading) {
   if (!button) return;
-  button.classList.toggle('loading', loading);
   button.disabled = loading;
   button.setAttribute('aria-busy', loading ? 'true' : 'false');
+  button.innerHTML = loading ? '<span class="spinner"></span> Ingresando…' : 'Iniciar sesión';
 }
 
 /**
- * Wraps a sign-in flow with consistent loading/error handling.
- * @param {HTMLButtonElement} button
- * @param {() => Promise<unknown>} signInFn
- * @param {string} label - Human-readable provider name for error toasts
+ * Maps a Firebase Auth error code to a friendly Spanish message.
+ * @param {{code?: string}} error
  */
-async function runSignIn(button, signInFn, method) {
-  setAuthButtonLoading(button, true);
+function authErrorMessage(error) {
+  switch (error && error.code) {
+    case 'auth/invalid-email':
+      return 'El email no es válido.';
+    case 'auth/user-disabled':
+      return 'Esta cuenta está deshabilitada. Escribinos para reactivarla.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Email o contraseña incorrectos.';
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos. Probá de nuevo en unos minutos.';
+    default:
+      return 'No pudimos iniciar sesión. Probá de nuevo.';
+  }
+}
+
+/**
+ * Handles the sign-in form submission.
+ * @param {Event} event
+ */
+async function handleSubmit(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+  const submitBtn = document.getElementById('auth-submit');
+  if (!emailInput || !passwordInput) return;
+
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!isValidEmail(email)) {
+    showToast('Ingresá un email válido.', 'error');
+    emailInput.focus();
+    return;
+  }
+  if (!password) {
+    showToast('Ingresá tu contraseña.', 'error');
+    passwordInput.focus();
+    return;
+  }
+
+  setSubmitLoading(submitBtn, true);
   try {
-    // Fire the reCAPTCHA challenge in parallel with the popup — the token is
-    // captured for future server-side validation but does not block auth today.
+    // Fire the reCAPTCHA challenge in parallel — the token is captured for
+    // future server-side validation but does not block auth today.
     const recaptchaPromise = executeRecaptcha(RecaptchaAction.LOGIN);
-    await signInFn();
+    await signInWithEmailPassword(email, password);
     const recaptchaToken = await recaptchaPromise;
-    trackEvent(AnalyticsEvent.LOGIN, { method, recaptcha: recaptchaToken ? 'ok' : 'missing' });
+    trackEvent(AnalyticsEvent.LOGIN, { method: 'password', recaptcha: recaptchaToken ? 'ok' : 'missing' });
     closeAuthModal();
     showToast('¡Sesión iniciada!', 'success');
   } catch (error) {
-    console.error(`AuthModal: ${method} sign-in failed`, error);
-    if (error && error.code !== 'auth/popup-closed-by-user') {
-      showToast('No pudimos iniciar sesión. Probá de nuevo.', 'error');
-    }
+    console.error('AuthModal: sign-in failed', error);
+    showToast(authErrorMessage(error), 'error');
   } finally {
-    setAuthButtonLoading(button, false);
+    setSubmitLoading(submitBtn, false);
+  }
+}
+
+/**
+ * Sends a password-reset email to whatever is currently typed in the email
+ * field (asking for it if empty).
+ */
+async function handleForgotPassword() {
+  const emailInput = document.getElementById('auth-email');
+  let email = (emailInput?.value || '').trim();
+  if (!email) {
+    email = (window.prompt('Ingresá tu email para restablecer la contraseña:') || '').trim();
+  }
+  if (!email) return;
+  if (!isValidEmail(email)) {
+    showToast('Ingresá un email válido.', 'error');
+    return;
+  }
+  try {
+    await sendPasswordReset(email);
+    showToast('Te enviamos un email para restablecer la contraseña.', 'success', 5000);
+  } catch (error) {
+    console.error('AuthModal: password reset failed', error);
+    // Do not reveal whether the account exists — always confirm.
+    showToast('Si el email está registrado, vas a recibir un enlace.', 'success', 5000);
   }
 }
 
@@ -144,11 +207,13 @@ export function initAuthModal() {
   const modal = document.getElementById('auth-modal');
   const closeBtn = document.getElementById('auth-modal-close');
   const backdrop = document.getElementById('auth-modal-backdrop');
-  const googleBtn = document.getElementById('auth-google-button');
-  const appleBtn = document.getElementById('auth-apple-button');
+  const form = document.getElementById('auth-form');
+  const forgotBtn = document.getElementById('auth-forgot');
 
   if (closeBtn) closeBtn.addEventListener('click', closeAuthModal);
   if (backdrop) backdrop.addEventListener('click', closeAuthModal);
+  if (form) form.addEventListener('submit', handleSubmit);
+  if (forgotBtn) forgotBtn.addEventListener('click', handleForgotPassword);
 
   // Escape closes, Tab is trapped within the modal when open.
   document.addEventListener('keydown', (e) => {
@@ -161,13 +226,6 @@ export function initAuthModal() {
       trapFocus(e, modal);
     }
   });
-
-  if (googleBtn) {
-    googleBtn.addEventListener('click', () => runSignIn(googleBtn, signInWithGoogle, 'google'));
-  }
-  if (appleBtn) {
-    appleBtn.addEventListener('click', () => runSignIn(appleBtn, signInWithApple, 'apple'));
-  }
 }
 
 /**

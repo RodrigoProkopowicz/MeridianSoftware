@@ -1,32 +1,17 @@
 /**
  * DemoAccessService.js
  *
- * Self-service 7-day demo gating for in-house products (Stock Manager, Medicus).
+ * Read helpers for the 7-day demo gating of in-house products (Stock Manager,
+ * Medicus). Demo access is now GRANTED BY AN ADMIN from the panel (there is no
+ * self-service activation): a visitor requests a trial via the public form, the
+ * admin creates the account and writes users/{uid}/demoAccess/{productId}.
  *
- * Flow:
- *   1. User signs in on meridian-software.com.
- *   2. Clicks "Activar demo de 7 días" on a product card.
- *   3. We write users/{uid}/demoAccess/{productId} with grantedAt + expiresAt.
- *   4. Stock Manager / Medicus check that doc on every login and refuse access
- *      when it doesn't exist or is past expiresAt.
- *
- * The doc is immutable per Firestore rules — extending or renewing requires
- * server-side intervention (Firebase Console / Admin SDK).
+ * Stock Manager / Medicus (and /cuenta) read that doc to know whether a demo is
+ * active and how many days remain.
  */
 
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/FirebaseConfig.js';
-
-/**
- * Duration of the self-service demo trial in milliseconds.
- *
- * Coupled with `withinSelfServiceCap` in firestore.rules — that rule caps
- * owner-side writes at `request.time + 7d + 5min` (the 5 min is clock-skew
- * tolerance). If you change this value, change the `7 * 24 * 60 * 60 * 1000`
- * in the rule too. The admin panel uses its own UI cap and is NOT bound by
- * this rule (see AdminService.MAX_DEMO_DAYS).
- */
-const DEMO_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Allowed product IDs — must match Firestore rules. */
 export const DEMO_PRODUCTS = Object.freeze({
@@ -54,34 +39,6 @@ export async function getDemoAccess(uid, productId) {
     expiresAtMs,
     expired: expiresAtMs < Date.now(),
   };
-}
-
-/**
- * Activates a 7-day demo for the given product. Idempotent only in the sense
- * that subsequent calls fail at the rules level (the doc is immutable once
- * created). Caller should check `getDemoAccess` first to avoid the failed
- * write round-trip.
- * @param {string} uid
- * @param {string} productId — one of DEMO_PRODUCTS.*
- * @returns {Promise<{ expiresAtMs: number }>}
- */
-export async function activateDemoAccess(uid, productId) {
-  if (productId !== DEMO_PRODUCTS.STOCK_MANAGER && productId !== DEMO_PRODUCTS.MEDICUS) {
-    throw new Error(`DemoAccessService: invalid productId ${productId}`);
-  }
-
-  const expiresAtMs = Date.now() + DEMO_DURATION_MS;
-  const expiresAt = Timestamp.fromMillis(expiresAtMs);
-
-  const ref = doc(db, 'users', uid, 'demoAccess', productId);
-  await setDoc(ref, {
-    productId,
-    grantedAt: serverTimestamp(),
-    expiresAt,
-    status: 'active',
-  });
-
-  return { expiresAtMs };
 }
 
 /** Days remaining until expiry (0 if expired). */

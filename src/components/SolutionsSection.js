@@ -5,7 +5,6 @@
  */
 
 import { renderSolutionCard } from './SolutionCard.js';
-import { getCurrentUser } from '../services/AuthenticationService.js';
 import { trackEvent } from '../services/AnalyticsService.js';
 import { AnalyticsEvent } from '../services/AnalyticsEvents.js';
 import { smoothScrollTo } from '../utils/DomHelper.js';
@@ -89,27 +88,19 @@ export function renderSolutionsSection() {
 }
 
 /**
- * Initializes solutions section event listeners.
- * @param {Function} openAuthModal - Function to open auth modal
+ * Initializes solutions section event listeners. Clicking a solution's demo
+ * trigger scrolls to the public request form and pre-selects that solution.
  */
-export function initSolutionsSection(openAuthModal) {
+export function initSolutionsSection() {
   document.querySelectorAll('[data-demo-trigger]').forEach(button => {
     button.addEventListener('click', () => {
       const solutionId = button.dataset.demoTrigger;
-      const user = getCurrentUser();
-
       trackEvent(AnalyticsEvent.SOLUTION_DEMO_CLICKED, { solution_id: solutionId });
-
-      if (!user) {
-        openAuthModal('solution_card');
-      } else {
-        // Scroll to demo section and pre-select solution
-        smoothScrollTo('#demo', 80);
-        setTimeout(() => {
-          const select = document.getElementById('demo-solution-select');
-          if (select) select.value = solutionId;
-        }, 600);
-      }
+      smoothScrollTo('#demo', 80);
+      setTimeout(() => {
+        const select = document.getElementById('demo-solution-select');
+        if (select) select.value = solutionId;
+      }, 600);
     });
   });
 }

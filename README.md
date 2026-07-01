@@ -2,10 +2,10 @@
 
 Landing, secciones de cuenta/ventas y backend serverless de **Meridian Software**. Es un **build multi-página de Vite con 4 entries** sobre un único proyecto de Firebase (Auth + Firestore + App Check + Functions + Hosting):
 
-- **Landing** (`index.html` → `src/main.js`) — sitio público en [meridian-software.com](https://www.meridian-software.com): autenticación Google/Apple, formularios de contacto y demo, y gating de acceso a los productos in-house.
-- **/promo** (`promo.html` → `src/PromotionalSection/`) — vende webs mensuales a comercios locales vía **suscripciones de Mercado Pago** (preapproval). Form gateado tras login, cuenta regresiva, logos de clientes.
-- **/cuenta** (`cuenta.html` → `src/account/`) — "Mis Productos": el usuario logueado ve sus webs (suscripciones) y demos, y puede **auto-cancelar** suscripciones pagas. Lee vía un callable saneado (`listMyProducts`), no Firestore directo.
-- **/admin** (`admin.html` → `src/admin/`) — panel interno gateado por custom claim `admin == true`. Tabs: **Leads** (contactos + solicitudes de demo), **Usuarios** (grant/revoke admin, borrar usuarios, demos por producto) y **Promocional** (gestión de suscripciones + precio por cliente).
+- **Landing** (`index.html` → `src/main.js`) — sitio público en [meridian-software.com](https://www.meridian-software.com): login por **email + contraseña** (las cuentas las crea un admin; no hay auto-registro), formulario de contacto y **formulario público de solicitud de prueba gratuita**, y gating de acceso a los productos in-house.
+- **/promo** (`promo.html` → `src/PromotionalSection/`) — vende webs mensuales a comercios locales vía **suscripciones de Mercado Pago** (preapproval). Cuenta regresiva, logos de clientes.
+- **/cuenta** (`cuenta.html` → `src/account/`) — "Mis Productos": el usuario logueado (con la cuenta que le creó el admin) ve sus webs (suscripciones) y demos, y puede **auto-cancelar** suscripciones pagas. Lee vía un callable saneado (`listMyProducts`), no Firestore directo.
+- **/admin** (`admin.html` → `src/admin/`) — panel interno gateado por custom claim `admin == true`. Tabs: **Pedidos** (contactos + solicitudes de prueba del formulario público, con acción "crear cuenta desde el pedido"), **Usuarios** (crear usuarios, grant/revoke admin, borrar usuarios, demos por producto) y **Promocional** (gestión de suscripciones + precio por cliente).
 - **Cloud Functions** (`functions/`) — reCAPTCHA, gestión de admins/usuarios, la suite de facturación AFIP (Stock Manager) y la suite de pagos de Mercado Pago (`functions/promotional/`).
 
 ## Stack
@@ -98,22 +98,24 @@ Dashboard de cuenta del usuario logueado. Lista sus webs (suscripciones) y sus d
 
 - Acceso: https://www.meridian-software.com/admin
 - Gateo: requiere el custom claim `admin == true` en el ID token (set vía Admin SDK, no editable desde el cliente). El claim se espeja en `users/{uid}.admin` solo para mostrar el badge en el panel.
-- Otorgar admin la primera vez: [`functions/scripts/grant-first-admin.mjs`](functions/scripts/grant-first-admin.mjs) con un `service-account.json`. Los siguientes admins se otorgan desde el panel (tab Usuarios) vía `setAdminClaim`.
-- Tabs: **Leads**, **Usuarios** (grant/revoke admin, borrar usuario, demos por producto), **Promocional** (suscripciones MP + precio por cliente).
+- **Primer admin (email + contraseña):** [`functions/scripts/create-admin-user.mjs`](functions/scripts/create-admin-user.mjs) crea la cuenta, setea el claim y escribe el perfil. Con ADC (`gcloud auth application-default login`), desde `functions/`: `npm run create-admin -- --email you@example.com --password 'StrongPass' --name 'Tu Nombre'`. Después iniciás sesión en `/admin` y creás el resto desde el panel.
+- Los siguientes usuarios/admins se crean desde el panel (tab **Usuarios** → "Crear usuario") vía el callable `createUser`; el rol admin también se otorga/revoca con `setAdminClaim`.
+- Tabs: **Pedidos**, **Usuarios** (crear usuario, grant/revoke admin, borrar usuario, demos por producto), **Promocional** (suscripciones MP + precio por cliente).
 - Layout: sidebar (260px) + topbar + master-detail.
 
 ## Demo gating
 
-Tres apps comparten un único proyecto de Firebase y la misma colección `users/{uid}`. Stock Manager y Medicus **no** crean cuentas — el registro pasa solo por meridian-software.com. El acceso a cada producto se gatea vía `users/{uid}/demoAccess/{productId}`:
+Tres apps comparten un único proyecto de Firebase y la misma colección `users/{uid}`. **Ninguna** app crea cuentas por auto-registro: las cuentas las crea un admin (callable `createUser`) desde el panel. El acceso a cada producto se gatea vía `users/{uid}/demoAccess/{productId}`:
 
 - `productId` ∈ `{'stock-manager', 'medicus'}`
-- Demos self-service de 7 días, con cap en las firestore rules.
-- Admins pueden extender / revocar / re-otorgar desde el panel; cap del UI = 7 días. Vía Admin SDK no hay cap.
+- El demo se **solicita** por el formulario público (`demoRequests`); un admin lo otorga desde el panel (o al crear la cuenta con `createUser`). Ya **no** hay auto-servicio: `demoAccess` create/update/delete es admin-only en las rules.
+- Admins pueden otorgar / extender / revocar desde el panel; cap del UI = 7 días (ajustable). Vía Admin SDK no hay cap.
 - Las rules viven en este repo (`firestore.rules`) y los repos hermanos (`StockManager/firebase.json`, `Medicus/firebase.json`) las referencian con `../MeridianSoftware/firestore.rules`.
 
 ## Cloud Functions
 
 - `validateDemoRecaptcha` — filtra `demoRequests` por score de reCAPTCHA Enterprise.
+- `createUser` — callable admin (App Check): crea la cuenta de Auth (email + contraseña), escribe el perfil `users/{uid}`, y opcionalmente otorga claim admin y accesos demo. Es la única vía de alta de usuarios.
 - `setAdminClaim` — callable, solo para admins existentes; setea/revoca el claim `admin`.
 - `deleteUser` — callable admin (App Check): borra cuenta de Auth + doc `users/{uid}` + subcolección `demoAccess`.
 - **Suite AFIP** (`functions/afip/`) — facturación electrónica para Stock Manager (`@afipsdk/afip.js`, Secret `AFIPSDK_ACCESS_TOKEN`).

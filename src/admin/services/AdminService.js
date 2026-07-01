@@ -24,6 +24,7 @@ import firebaseApp from '../../config/FirebaseConfig.js';
 
 const functions = getFunctions(firebaseApp);
 const setAdminClaimCallable = httpsCallable(functions, 'setAdminClaim');
+const createUserCallable = httpsCallable(functions, 'createUser');
 const deleteUserCallable = httpsCallable(functions, 'deleteUser');
 const cancelPromotionalCallable = httpsCallable(functions, 'cancelPromotionalSubscription');
 const updatePromotionalAmountCallable = httpsCallable(functions, 'updatePromotionalAmount');
@@ -179,6 +180,18 @@ export async function revokeDemoAccess(uid, productId) {
 export async function extendDemoAccess(uid, productId, days = DEFAULT_DEMO_DAYS) {
   await revokeDemoAccess(uid, productId);
   await grantDemoAccess(uid, productId, days);
+}
+
+/**
+ * Crea una cuenta de usuario (email + contraseña) vía la callable createUser.
+ * Los usuarios no se auto-registran; solo el admin los da de alta.
+ * @param {{ email: string, password: string, displayName?: string, admin?: boolean,
+ *           demos?: Array<{ productId: string, days?: number }> }} payload
+ * @returns {Promise<{ uid: string, email: string }>}
+ */
+export async function createUser(payload) {
+  const result = await createUserCallable(payload);
+  return result.data;
 }
 
 /**

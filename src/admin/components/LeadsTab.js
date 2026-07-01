@@ -9,9 +9,10 @@ import { listLeads, updateLead } from '../services/AdminService.js';
 import { escapeHtml, showToast } from '../../utils/DomHelper.js';
 import { formatTimestamp } from '../utils/Format.js';
 import { renderTopbarActions, setTopbarMeta, openDetailSheet, detailBackButtonHtml } from './AdminShell.js';
+import { openCreateUserModal } from './CreateUserModal.js';
 
 const CONTACT_STATUSES = ['new', 'contacted', 'closed', 'spam'];
-const DEMO_STATUSES = ['pending', 'scheduled', 'done', 'rejected'];
+const DEMO_STATUSES = ['pending', 'contacted', 'approved', 'rejected'];
 
 let leads = [];
 let selectedId = null;
@@ -52,14 +53,14 @@ async function loadLeads() {
   try {
     leads = await listLeads();
     renderList();
-    setTopbarMeta(`${leads.length} ${leads.length === 1 ? 'lead' : 'leads'}`);
+    setTopbarMeta(`${leads.length} ${leads.length === 1 ? 'pedido' : 'pedidos'}`);
     if (selectedId && !leads.find(l => l.id === selectedId)) {
       selectedId = null;
     }
     renderDetail();
   } catch (err) {
     console.error('LeadsTab: load failed', err);
-    list.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar los leads: ${escapeHtml(err.message)}</div>`;
+    list.innerHTML = `<div class="admin-empty admin-empty--error">No pudimos cargar los pedidos: ${escapeHtml(err.message)}</div>`;
     setTopbarMeta('');
   }
 }
@@ -69,7 +70,7 @@ function renderList() {
   if (!list) return;
 
   if (leads.length === 0) {
-    list.innerHTML = '<div class="admin-empty">Todavía no hay leads.</div>';
+    list.innerHTML = '<div class="admin-empty">Todavía no hay pedidos.</div>';
     return;
   }
 
@@ -102,14 +103,16 @@ function renderList() {
 }
 
 function rowHtml(lead) {
-  const type = lead._type === 'contact' ? 'Contacto' : 'Demo';
+  const type = lead._type === 'contact' ? 'Contacto' : 'Pedido';
   const date = formatTimestamp(lead.createdAt);
+  // Demo requests carry contact name/email directly (public form). Legacy docs
+  // may only have companyName/userId — fall back to those.
   const name = lead._type === 'contact'
     ? escapeHtml(lead.name || '—')
-    : escapeHtml(lead.companyName || '—');
+    : escapeHtml(lead.name || lead.companyName || '—');
   const contact = lead._type === 'contact'
     ? escapeHtml(lead.email || '')
-    : escapeHtml(lead.solutionType || '');
+    : escapeHtml(lead.email || lead.solutionType || '');
   const status = escapeHtml(lead.status || '—');
   const selected = selectedId === lead.id ? ' is-selected' : '';
   return `
@@ -130,7 +133,7 @@ function detailPlaceholder() {
         <svg class="admin-detail__placeholder-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M9 5h12M9 12h12M9 19h12M4 5h.01M4 12h.01M4 19h.01"/>
         </svg>
-        Seleccioná un lead para ver los detalles
+        Seleccioná un pedido para ver los detalles
         y editar su estado.
       </div>
     </div>
@@ -154,7 +157,7 @@ function renderDetail() {
     <div class="admin-detail">
       ${detailBackButtonHtml()}
       <div class="admin-detail__head">
-        <span class="admin-pill admin-pill--${lead._type}">${isContact ? 'Contacto' : 'Demo'}</span>
+        <span class="admin-pill admin-pill--${lead._type}">${isContact ? 'Contacto' : 'Pedido'}</span>
         <span class="admin-detail__date">${escapeHtml(formatTimestamp(lead.createdAt))}</span>
       </div>
 
@@ -166,10 +169,12 @@ function renderDetail() {
           <dt>Mensaje</dt>
           <dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
         ` : `
+          <dt>Nombre</dt><dd>${escapeHtml(lead.name || '—')}</dd>
+          <dt>Email</dt><dd>${escapeHtml(lead.email || '—')}</dd>
           <dt>Empresa</dt><dd>${escapeHtml(lead.companyName || '—')}</dd>
           <dt>Solución</dt><dd>${escapeHtml(lead.solutionType || '—')}</dd>
-          <dt>Fecha sugerida</dt><dd>${escapeHtml(lead.preferredDate || '—')}</dd>
-          <dt>UID</dt><dd><code>${escapeHtml(lead.userId || '—')}</code></dd>
+          ${lead.preferredDate ? `<dt>Fecha sugerida</dt><dd>${escapeHtml(lead.preferredDate)}</dd>` : ''}
+          ${lead.userId ? `<dt>UID</dt><dd><code>${escapeHtml(lead.userId)}</code></dd>` : ''}
           <dt>Mensaje</dt>
           <dd class="admin-detail__message">${escapeHtml(lead.message || '')}</dd>
         `}
@@ -177,6 +182,15 @@ function renderDetail() {
           ? `<dt>reCAPTCHA</dt><dd>${lead.recaptchaScore.toFixed(2)}</dd>`
           : ''}
       </dl>
+
+      ${!isContact ? `
+        <div class="admin-detail__actions">
+          <button class="admin-button admin-button--primary" id="lead-create-account">Crear cuenta desde este pedido</button>
+        </div>
+        <p class="admin-detail__hint">
+          Crea la cuenta del cliente y, opcionalmente, otorga la prueba en el mismo paso.
+        </p>
+      ` : ''}
 
       <div class="admin-detail__edit">
         <label class="admin-field">
@@ -197,6 +211,32 @@ function renderDetail() {
   `;
 
   document.getElementById('lead-save')?.addEventListener('click', () => saveLead(lead));
+  document.getElementById('lead-create-account')?.addEventListener('click', () => createAccountFromLead(lead));
+}
+
+/**
+ * Opens the create-user modal prefilled from a demo request. On success marks
+ * the request as "approved" so the pedido reflects that it was actioned.
+ * @param {Object} lead
+ */
+function createAccountFromLead(lead) {
+  openCreateUserModal({
+    prefill: {
+      email: lead.email || '',
+      displayName: lead.name || '',
+      solutionType: lead.solutionType || '',
+    },
+    onCreated: async () => {
+      try {
+        await updateLead('demo', lead.id, { status: 'approved' });
+        lead.status = 'approved';
+        renderList();
+        renderDetail();
+      } catch (err) {
+        console.error('LeadsTab: could not mark request approved', err);
+      }
+    },
+  });
 }
 
 async function saveLead(lead) {
@@ -209,7 +249,7 @@ async function saveLead(lead) {
     await updateLead(lead._type, lead.id, { status, adminNotes });
     Object.assign(lead, { status, adminNotes });
     renderList();
-    showToast('Lead actualizado', 'success');
+    showToast('Pedido actualizado', 'success');
   } catch (err) {
     console.error('LeadsTab: save failed', err);
     showToast(`No pudimos guardar: ${err.message}`, 'error');

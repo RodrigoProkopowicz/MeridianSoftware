@@ -14,7 +14,7 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
 initializeApp();
@@ -180,6 +180,102 @@ exports.setAdminClaim = onCall(async (request) => {
   await getFirestore().collection('users').doc(uid).set({ admin }, { merge: true });
 
   return { uid, admin };
+});
+
+/**
+ * createUser — crea una cuenta de usuario (email + contraseña) desde el panel.
+ * Los usuarios NO se auto-registran: solo un admin puede darlos de alta.
+ *
+ * Crea la cuenta en Authentication, escribe el perfil `users/{uid}` (Admin SDK
+ * bypassea las reglas), y opcionalmente otorga el claim admin y/o accesos demo.
+ *
+ * Input:  {
+ *   email: string, password: string, displayName?: string, admin?: boolean,
+ *   demos?: Array<{ productId: 'stock-manager'|'medicus', days?: number }>
+ * }
+ * Output: { uid, email }
+ */
+exports.createUser = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Admin privileges required.');
+  }
+
+  const { email, password, displayName, admin = false, demos = [] } = request.data || {};
+
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Ingresá un email válido.');
+  }
+  if (typeof password !== 'string' || password.length < 6) {
+    throw new HttpsError('invalid-argument', 'La contraseña debe tener al menos 6 caracteres.');
+  }
+  if (typeof admin !== 'boolean') {
+    throw new HttpsError('invalid-argument', '`admin` debe ser booleano.');
+  }
+  if (!Array.isArray(demos)) {
+    throw new HttpsError('invalid-argument', '`demos` debe ser una lista.');
+  }
+
+  const auth = getAuth();
+  const db = getFirestore();
+  const name = typeof displayName === 'string' ? displayName.trim() : '';
+
+  // 1. Crear la cuenta de Authentication.
+  let userRecord;
+  try {
+    userRecord = await auth.createUser({
+      email: email.trim(),
+      password,
+      displayName: name || undefined,
+      emailVerified: false,
+    });
+  } catch (err) {
+    if (err.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'Ya existe una cuenta con ese email.');
+    }
+    if (err.code === 'auth/invalid-password') {
+      throw new HttpsError('invalid-argument', 'La contraseña no es válida.');
+    }
+    console.error('createUser: auth create failed', err.message);
+    throw new HttpsError('internal', `No pudimos crear la cuenta: ${err.message}`);
+  }
+
+  const uid = userRecord.uid;
+
+  // 2. Claim admin (opcional).
+  if (admin) {
+    await auth.setCustomUserClaims(uid, { admin: true });
+  }
+
+  // 3. Perfil en Firestore.
+  await db.collection('users').doc(uid).set({
+    email: email.trim(),
+    displayName: name,
+    photoURL: '',
+    provider: 'password',
+    admin,
+    createdAt: FieldValue.serverTimestamp(),
+    lastLoginAt: FieldValue.serverTimestamp(),
+  });
+
+  // 4. Accesos demo (opcional).
+  const ALLOWED_PRODUCTS = ['stock-manager', 'medicus'];
+  for (const demo of demos) {
+    const productId = demo && demo.productId;
+    if (!ALLOWED_PRODUCTS.includes(productId)) continue;
+    const days = Math.max(1, Math.min(Number(demo.days) || 7, 365));
+    const expiresAt = Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
+    await db.collection('users').doc(uid).collection('demoAccess').doc(productId).set({
+      productId,
+      grantedAt: FieldValue.serverTimestamp(),
+      expiresAt,
+      status: 'active',
+    });
+  }
+
+  return { uid, email: email.trim() };
 });
 
 /**

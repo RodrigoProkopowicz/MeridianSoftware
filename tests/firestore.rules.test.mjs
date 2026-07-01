@@ -119,24 +119,15 @@ describe('users/{uid}/demoAccess/{productId}', () => {
     status: 'active',
   });
 
-  test('owner crea un demo válido de ≤7 días', async () => {
-    await assertSucceeds(
+  test('owner NO puede crear un demo (ya no hay auto-servicio: admin-only)', async () => {
+    await assertFails(
       setDoc(doc(owner('alice'), 'users/alice/demoAccess/stock-manager'), demoDoc(6 * DAY)),
     );
   });
 
-  test('owner NO puede crear un demo de >7 días (cap)', async () => {
-    await assertFails(
-      setDoc(doc(owner('alice'), 'users/alice/demoAccess/stock-manager'), demoDoc(8 * DAY)),
-    );
-  });
-
-  test('owner NO puede crear un demo para un productId inválido', async () => {
-    await assertFails(
-      setDoc(doc(owner('alice'), 'users/alice/demoAccess/otra-cosa'), {
-        ...demoDoc(6 * DAY),
-        productId: 'otra-cosa',
-      }),
+  test('admin crea un demo (sin cap de días)', async () => {
+    await assertSucceeds(
+      setDoc(doc(admin(), 'users/alice/demoAccess/stock-manager'), demoDoc(30 * DAY)),
     );
   });
 
@@ -159,45 +150,50 @@ describe('users/{uid}/demoAccess/{productId}', () => {
     await assertSucceeds(deleteDoc(doc(admin(), 'users/alice/demoAccess/stock-manager')));
   });
 
-  test('otro usuario NO puede leer el demo ajeno', async () => {
+  test('owner lee su propio demo; otro usuario no', async () => {
     await seed((db) => setDoc(doc(db, 'users/alice/demoAccess/stock-manager'), demoDoc(6 * DAY)));
+    await assertSucceeds(getDoc(doc(owner('alice'), 'users/alice/demoAccess/stock-manager')));
     await assertFails(getDoc(doc(other('mallory'), 'users/alice/demoAccess/stock-manager')));
   });
 });
 
 // ============================================================
 describe('demoRequests/{id}', () => {
-  const reqDoc = (uid) => ({
-    userId: uid,
-    solutionType: 'web',
+  const reqDoc = (overrides = {}) => ({
+    name: 'Alice Cliente',
+    email: 'alice@example.com',
     companyName: 'ACME',
+    solutionType: 'stock-manager',
     message: 'hola',
-    preferredDate: '2026-06-01',
     status: 'pending',
     recaptchaToken: 'tok',
     createdAt: Timestamp.now(),
+    ...overrides,
   });
 
-  test('usuario logueado crea su request (status pending)', async () => {
-    await assertSucceeds(
-      setDoc(doc(owner('alice'), 'demoRequests/r1'), reqDoc('alice')),
-    );
+  test('un visitante anónimo crea un pedido válido (formulario público)', async () => {
+    await assertSucceeds(setDoc(doc(anon(), 'demoRequests/r1'), reqDoc()));
   });
 
-  test('NO puede crear con userId distinto al propio', async () => {
-    await assertFails(
-      setDoc(doc(owner('alice'), 'demoRequests/r1'), reqDoc('bob')),
-    );
+  test('un usuario logueado también puede crear', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'demoRequests/r2'), reqDoc()));
+  });
+
+  test('NO puede crear sin name o email', async () => {
+    await assertFails(setDoc(doc(anon(), 'demoRequests/r1'), reqDoc({ name: '' })));
+    await assertFails(setDoc(doc(anon(), 'demoRequests/r2'), reqDoc({ email: '' })));
   });
 
   test('NO puede crear con status != pending', async () => {
-    await assertFails(
-      setDoc(doc(owner('alice'), 'demoRequests/r1'), { ...reqDoc('alice'), status: 'done' }),
-    );
+    await assertFails(setDoc(doc(anon(), 'demoRequests/r1'), reqDoc({ status: 'approved' })));
+  });
+
+  test('NO puede crear con un campo fuera del whitelist (ej. userId)', async () => {
+    await assertFails(setDoc(doc(anon(), 'demoRequests/r1'), reqDoc({ userId: 'alice' })));
   });
 
   test('solo admin lista/lee; admin puede cambiar status', async () => {
-    await seed((db) => setDoc(doc(db, 'demoRequests/r1'), reqDoc('alice')));
+    await seed((db) => setDoc(doc(db, 'demoRequests/r1'), reqDoc()));
     await assertFails(getDocs(collection(owner('alice'), 'demoRequests')));
     await assertSucceeds(getDocs(collection(admin(), 'demoRequests')));
     await assertSucceeds(updateDoc(doc(admin(), 'demoRequests/r1'), { status: 'contacted' }));

@@ -13,7 +13,7 @@
 export const AnalyticsEvent = Object.freeze({
   /**
    * User successfully authenticated.
-   * Params: `{ method: 'google' | 'apple' }`.
+   * Params: `{ method: 'password' }`.
    * Firebase-recommended.
    */
   LOGIN: 'login',
@@ -50,11 +50,4 @@ export const AnalyticsEvent = Object.freeze({
    * Firebase-recommended.
    */
   SELECT_CONTENT: 'select_content',
-
-  /**
-   * User activated a 7-day demo for an in-house product.
-   * Params: `{ product_id: 'stock-manager' | 'medicus' }`.
-   * Custom.
-   */
-  PRODUCT_DEMO_ACTIVATED: 'product_demo_activated',
 });

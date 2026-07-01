@@ -1,23 +1,20 @@
 /**
  * AuthenticationService.js
- * 
- * Manages Firebase Authentication flows including Google and Apple sign-in,
- * sign-out, and auth state observation. Automatically creates/updates
- * user profiles in Firestore on successful authentication.
+ *
+ * Manages Firebase Authentication flows. Accounts are provisioned by an admin
+ * from the panel (email + password) — there is NO self-service registration.
+ * This service only signs an existing account in/out, exposes password reset,
+ * and keeps the user's Firestore profile fresh (lastLoginAt) on login.
  */
 
 import {
-  GoogleAuthProvider,
-  OAuthProvider,
-  signInWithPopup,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, appCheckReady } from '../config/FirebaseConfig.js';
-
-const googleProvider = new GoogleAuthProvider();
-const appleProvider = new OAuthProvider('apple.com');
 
 /** @type {Array<Function>} */
 const authStateListeners = [];
@@ -47,23 +44,23 @@ export function initializeAuthListener() {
 }
 
 /**
- * Sign in with Google popup.
+ * Sign in with an email + password. The account must have been created by an
+ * admin beforehand (there is no self-service sign-up).
+ * @param {string} email
+ * @param {string} password
  * @returns {Promise<import('firebase/auth').UserCredential>}
  */
-export async function signInWithGoogle() {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result;
+export async function signInWithEmailPassword(email, password) {
+  return signInWithEmailAndPassword(auth, email.trim(), password);
 }
 
 /**
- * Sign in with Apple popup.
- * @returns {Promise<import('firebase/auth').UserCredential>}
+ * Sends a password-reset email so a user can set / recover their password.
+ * @param {string} email
+ * @returns {Promise<void>}
  */
-export async function signInWithApple() {
-  appleProvider.addScope('email');
-  appleProvider.addScope('name');
-  const result = await signInWithPopup(auth, appleProvider);
-  return result;
+export async function sendPasswordReset(email) {
+  return sendPasswordResetEmail(auth, email.trim());
 }
 
 /**

@@ -16,7 +16,7 @@ import { renderPromotionalTab, initPromotionalTab, destroyPromotionalTab } from 
 const TABS = [
   {
     id: 'leads',
-    label: 'Leads',
+    label: 'Pedidos',
     icon: `<path d="M3 7h18M3 12h18M3 17h18"/>`,
   },
   {

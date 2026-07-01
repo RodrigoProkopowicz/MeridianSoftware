@@ -82,11 +82,11 @@ function initializeApplication() {
   // 3. Initialize all component event listeners
   initNavigationBar();
   initHeroSection();
-  initProductsSection(openAuthModal);
-  initSolutionsSection(openAuthModal);
+  initProductsSection();
+  initSolutionsSection();
   initCaseStudiesSection();
   initTestimonialsSection();
-  initDemoRequestSection(openAuthModal);
+  initDemoRequestSection();
   initContactSection();
   initAuthModal();
   initUserProfileBadge(openAuthModal);

@@ -12,7 +12,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "grant-admin": "node scripts/grant-first-admin.mjs"
+    "grant-admin": "node scripts/grant-first-admin.mjs",
+    "create-admin": "node scripts/create-admin-user.mjs"
   },
   "dependencies": {
     "@afipsdk/afip.js": "^1.2.3",

@@ -624,17 +624,19 @@ body.scroll-locked {
   font-size: var(--font-size-sm);
 }
 
-.admin-button--google,
-.admin-button--apple {
-  background: #fff; color: #1a1a1a; border-color: #fff;
-  font-weight: var(--font-weight-semibold);
-  padding: 0.65rem 1rem;
+.admin-auth__link {
+  align-self: center;
+  margin-top: 0.15rem;
+  padding: 0.3rem;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color var(--transition-fast);
 }
-.admin-button--google:hover:not(:disabled),
-.admin-button--apple:hover:not(:disabled) {
-  background: #f3f3f3; border-color: #f3f3f3;
-}
+.admin-auth__link:hover { color: var(--color-text-secondary); }
 
 /* ============================================
    Page header (inside tabs)
@@ -1343,3 +1345,87 @@ select.admin-input {
   .admin-detail__actions { gap: var(--space-xs); }
   .admin-detail__actions .admin-button { flex: 1 1 auto; }
 }
+
+/* ============================================
+   Create-user modal (shared by Users + Leads)
+   ============================================ */
+.admin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+.admin-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.admin-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100dvh - var(--space-2xl));
+  overflow-y: auto;
+  background: var(--color-surface, #12181f);
+  border: 1px solid var(--color-surface-glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-xl);
+}
+.admin-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+.admin-modal__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.admin-modal__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+.admin-modal__close:hover { color: var(--color-text-primary); }
+.admin-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.admin-modal__inline {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-end;
+}
+.admin-modal__inline .admin-input { flex: 1; }
+.admin-modal__inline select.admin-input { flex: 1; }
+.admin-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.admin-field__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.admin-checkbox input { width: 16px; height: 16px; accent-color: var(--color-accent); }

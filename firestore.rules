@@ -3,8 +3,8 @@ rules_version = '2';
 // Meridian Software — Firestore Security Rules
 //
 // Collections:
-//   users/{uid}               — user profile owned by that uid
-//   demoRequests/{id}         — created by authenticated user; immutable after create
+//   users/{uid}               — perfil del usuario; las cuentas las crea un admin (callable createUser)
+//   demoRequests/{id}         — pedido de prueba del formulario público (sin login); lo lee el admin
 //   contactSubmissions/{id}   — created by anyone (anonymous contact form); read by admin only
 //
 // Deploy with:  firebase deploy --only firestore:rules
@@ -58,57 +58,44 @@ service cloud.firestore {
       allow create: if isOwner(uid)
                        && hasOnlyFields(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
                        && payloadSizeOK();
-      // Owner puede actualizar los campos originales sin tocar `role` (lo mantiene
-      // como estaba o lo deja ausente). Admin puede modificar `role`.
+      // Owner puede actualizar los campos originales sin tocar `role` ni `admin`
+      // (los mantiene como estaban o ausentes). Admin puede modificar ambos.
+      // `admin` lo escribe la callable createUser/setAdminClaim (Admin SDK) para
+      // que el panel sepa quién es admin; el owner nunca puede cambiarlo.
       allow update: if (isOwner(uid)
-                         && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role'])
+                         && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin'])
                          && request.resource.data.get('role', null) == resource.data.get('role', null)
+                         && request.resource.data.get('admin', null) == resource.data.get('admin', null)
                          && payloadSizeOK())
                       || (isAdmin()
-                           && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role']));
+                           && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin']));
       allow delete: if false;
 
       // ---- users/{uid}/demoAccess/{productId} ----
-      // Self-service 7-day demo grant for in-house products (stock-manager, medicus).
-      // El usuario lo crea desde meridian-software.com (capped a 7 días).
-      // El admin lo extiende / revoca sin cap desde el panel /admin
-      // (`allow update/delete: if isAdmin();` no pasa por withinSelfServiceCap).
+      // Demo grants for in-house products (stock-manager, medicus). Ya NO hay
+      // auto-servicio: el visitante pide la prueba por el formulario público y
+      // un admin la otorga desde el panel /admin (o la callable createUser).
+      // Por eso create/update/delete son admin-only; el owner solo lee su estado.
       match /demoAccess/{productId} {
-        // Self-service cap: 7 días + 5 min de tolerancia para clock skew.
-        // Está acoplado con DEMO_DURATION_MS en src/services/DemoAccessService.js
-        // — si extendés el plazo del flujo self-service, movelo en ambos lados.
-        // No afecta al panel admin (UsersTab.js tiene su propio cap de UI).
-        function withinSelfServiceCap(expiresAt) {
-          let maxMs = request.time.toMillis() + (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 1000);
-          return expiresAt.toMillis() <= maxMs
-              && expiresAt.toMillis() >= request.time.toMillis();
-        }
-
         allow read:   if isOwner(uid) || isAdmin();
         allow list:   if isOwner(uid) || isAdmin();
-        allow create: if (isOwner(uid)
-                           && (productId == 'stock-manager' || productId == 'medicus')
-                           && request.resource.data.keys().hasOnly(['productId','grantedAt','expiresAt','status'])
-                           && request.resource.data.productId == productId
-                           && request.resource.data.status == 'active'
-                           && request.resource.data.expiresAt is timestamp
-                           && withinSelfServiceCap(request.resource.data.expiresAt))
-                        || isAdmin();
+        allow create: if isAdmin();
         allow update: if isAdmin();
         allow delete: if isAdmin();
       }
     }
 
     // ---- demoRequests/{id} ----
-    // Any signed-in user can create a request for themselves. Admins read/list
-    // and may update the status field (e.g. mark contacted) from the panel.
+    // Pedidos de prueba del formulario PÚBLICO (sin login): cualquiera puede
+    // crear uno con sus datos de contacto. App Check + la validación reCAPTCHA
+    // server-side (validateDemoRecaptcha) filtran spam. El admin lee/lista y
+    // puede actualizar solo status + adminNotes desde el panel.
     match /demoRequests/{id} {
       allow read, list: if isAdmin();
-      allow create: if isSignedIn()
-                       && request.resource.data.userId == request.auth.uid
-                       && hasOnlyFields(['userId','solutionType','companyName','message','preferredDate','status','recaptchaToken','createdAt'])
+      allow create: if hasOnlyFields(['name','email','companyName','solutionType','message','status','recaptchaToken','createdAt'])
+                       && isNonEmptyString(request.resource.data.name, 200)
+                       && isNonEmptyString(request.resource.data.email, 200)
                        && isNonEmptyString(request.resource.data.solutionType, 100)
-                       && isNonEmptyString(request.resource.data.companyName, 200)
                        && request.resource.data.status == 'pending'
                        && payloadSizeOK();
       allow update: if isAdmin()
