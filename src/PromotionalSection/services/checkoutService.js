@@ -66,7 +66,10 @@ export async function startSubscription(payload) {
 function messageForError(err) {
   const code = err?.code || '';
   if (code.includes('unauthenticated')) {
-    return 'Iniciá sesión para continuar y volvé a intentar.';
+    // El formulario de /promo es público (sin login): un `unauthenticated` acá
+    // proviene de App Check (navegador no verificado), no de una sesión faltante.
+    // No le pidas al usuario "iniciar sesión" en un form que no tiene login.
+    return 'No pudimos verificar tu navegador. Recargá la página e intentá de nuevo. Si sigue fallando, escribinos por WhatsApp.';
   }
   if (code.includes('invalid-argument')) {
     return 'Revisá los datos del formulario e intentá de nuevo.';
