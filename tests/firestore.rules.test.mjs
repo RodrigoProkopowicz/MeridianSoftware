@@ -260,6 +260,72 @@ describe('businesses/{id}/secrets — cerrado a todos', () => {
 });
 
 // ============================================================
+describe('businesses/{id}/remitos — Stock Manager', () => {
+  const remito = (over = {}) => ({
+    number: '0001-00000001',
+    numberInt: 1,
+    pointOfSale: '0001',
+    status: 'issued',
+    issuedAt: Timestamp.now(),
+    lineItems: [{ description: 'Cajas', quantity: 3, unit: 'un', unitPrice: 0, total: 0 }],
+    totalQuantity: 3,
+    subtotal: 0,
+    userId: 'alice',
+    ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+    });
+  });
+
+  test('el owner emite un remito; otro usuario y anónimo no', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), remito()));
+    await assertFails(setDoc(doc(other('mallory'), 'businesses/b1/remitos/r2'), remito({ userId: 'mallory' })));
+    await assertFails(setDoc(doc(anon(), 'businesses/b1/remitos/r3'), remito()));
+  });
+
+  test('el userId del remito tiene que ser el del emisor', async () => {
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), remito({ userId: 'mallory' })));
+  });
+
+  test('solo el owner (y el admin) leen los remitos del comercio', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/remitos/r1'), remito()));
+    await assertSucceeds(getDoc(doc(owner('alice'), 'businesses/b1/remitos/r1')));
+    await assertSucceeds(getDoc(doc(admin(), 'businesses/b1/remitos/r1')));
+    await assertFails(getDoc(doc(other('mallory'), 'businesses/b1/remitos/r1')));
+    await assertFails(getDoc(doc(anon(), 'businesses/b1/remitos/r1')));
+  });
+
+  test('anular sí, reescribir número o cantidades no', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/remitos/r1'), remito()));
+
+    await assertSucceeds(updateDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), {
+      status: 'cancelled',
+      cancelReason: 'Error de carga',
+      stockReversed: true,
+    }));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), { number: '0001-00009999' }));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), { totalQuantity: 999 }));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/remitos/r1'), { subtotal: 999 }));
+  });
+
+  test('el owner no puede borrar remitos; el admin sí', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/remitos/r1'), remito()));
+    await assertFails(deleteDoc(doc(owner('alice'), 'businesses/b1/remitos/r1')));
+    await assertSucceeds(deleteDoc(doc(admin(), 'businesses/b1/remitos/r1')));
+  });
+
+  test('el counter de remitos es del owner, cerrado para terceros', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/counters/remitos'), {
+      next: 2, updatedAt: Timestamp.now(),
+    }));
+    await assertFails(setDoc(doc(other('mallory'), 'businesses/b1/counters/remitos'), { next: 99 }));
+  });
+});
+
+// ============================================================
 describe('clinics/{id}/patients — Medicus (HC)', () => {
   test('owner lee su paciente; otro no', async () => {
     await seed(async (db) => {

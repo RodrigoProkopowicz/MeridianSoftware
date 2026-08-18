@@ -221,6 +221,25 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
 
+      // ---- remitos (comprobantes de entrega de mercadería) ----
+      // Mismo criterio que invoices: casi inmutables para el owner (se permite
+      // anular, no reescribir número ni cantidades). Admin tiene bypass total.
+      match /remitos/{remitoId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.size() < 40;
+        allow update: if (isOwner(businessOwner(businessId))
+                           && request.resource.data.size() < 40
+                           // Inmutables: número, cantidades y valorización
+                           && request.resource.data.number == resource.data.number
+                           && request.resource.data.numberInt == resource.data.numberInt
+                           && request.resource.data.totalQuantity == resource.data.totalQuantity
+                           && request.resource.data.subtotal == resource.data.subtotal)
+                        || isAdmin();
+        allow delete: if isAdmin();
+      }
+
       // ---- counters (numeración de comprobantes) ----
       match /counters/{counterId} {
         allow read:           if isOwner(businessOwner(businessId)) || isAdmin();
