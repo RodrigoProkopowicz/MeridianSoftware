@@ -240,6 +240,26 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
 
+      // ---- receipts (recibos: cobros sobre la cuenta corriente) ----
+      // Mismo criterio que remitos: casi inmutables para el owner (se permite
+      // anular, no reescribir número ni importe — el saldo del cliente se
+      // calcula desde estos docs y no puede reescribirse la historia).
+      match /receipts/{receiptId} {
+        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
+        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.size() < 30;
+        allow update: if (isOwner(businessOwner(businessId))
+                           && request.resource.data.size() < 30
+                           // Inmutables: número, cliente e importe
+                           && request.resource.data.number == resource.data.number
+                           && request.resource.data.numberInt == resource.data.numberInt
+                           && request.resource.data.clientId == resource.data.clientId
+                           && request.resource.data.total == resource.data.total)
+                        || isAdmin();
+        allow delete: if isAdmin();
+      }
+
       // ---- counters (numeración de comprobantes) ----
       match /counters/{counterId} {
         allow read:           if isOwner(businessOwner(businessId)) || isAdmin();
