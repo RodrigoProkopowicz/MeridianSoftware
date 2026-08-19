@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<!--
+  Pieza para Instagram (feed 4:5 → 1080×1350).
+  Promo "Plan Vecino" — geo-segmentada a San Miguel, Bella Vista y Muñiz.
+  Tokens de marca tomados de src/styles/variables.css.
+  Render: Chrome headless DPR 2 → master 2160×2700 → sips a 1080×1350.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #4A90D9;
+    --accent-light: #6BB5FF;
+    --accent-dark: #3570B0;
+    --surface: #0F1923;
+    --surface-elevated: #1B2838;
+    --text: #F0EBE3;
+    --text-dim: #94A6B8;
+    --amber: #FBBF24;
+    --amber-deep: #F59E0B;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { width: 1080px; height: 1350px; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1350px;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 82% -8%, rgba(74,144,217,0.30) 0%, rgba(74,144,217,0) 55%),
+      radial-gradient(90% 70% at 0% 108%, rgba(106,181,255,0.16) 0%, rgba(106,181,255,0) 60%),
+      linear-gradient(158deg, #0F1C28 0%, #16283C 52%, #0B1622 100%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    padding: 74px 78px 66px;
+  }
+
+  /* Orbe decorativo difuso, refuerza el glow de marca sin robar protagonismo */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(8px);
+    pointer-events: none;
+  }
+  .orb--ring {
+    top: -190px; right: -160px;
+    width: 520px; height: 520px;
+    background: transparent;
+    border: 2px solid rgba(106,181,255,0.18);
+    box-shadow: 0 0 120px rgba(74,144,217,0.25) inset;
+    filter: none;
+  }
+  .orb--dot {
+    bottom: 380px; left: -120px;
+    width: 260px; height: 260px;
+    background: radial-gradient(circle, rgba(74,144,217,0.22), rgba(74,144,217,0));
+  }
+
+  /* Fina textura de líneas, casi imperceptible, da “profundidad premium” */
+  .grain {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 3px);
+    pointer-events: none;
+  }
+
+  /* ---- Top: logo + pill de urgencia ---- */
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative; z-index: 2;
+  }
+  .logo { height: 44px; width: auto; display: block; }
+
+  .urgency {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 30px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+    color: #2A1A02;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    box-shadow: 0 14px 38px rgba(245,158,11,0.50), 0 0 0 6px rgba(251,191,36,0.16);
+    transform: rotate(-2deg);
+  }
+  .urgency__ico { width: 28px; height: 28px; }
+
+  /* ---- Eyebrow: zonas alcanzadas ---- */
+  .zones {
+    margin-top: 64px;
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 11px;
+    padding: 12px 22px;
+    border-radius: 9999px;
+    background: rgba(74,144,217,0.12);
+    border: 1px solid rgba(106,181,255,0.30);
+    color: var(--accent-light);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    position: relative; z-index: 2;
+  }
+  .zones svg { width: 19px; height: 19px; }
+  .zones b { color: var(--text); font-weight: 700; }
+
+  /* ---- Hero ---- */
+  .hero { margin-top: 30px; position: relative; z-index: 2; }
+  .hero__pre {
+    font-size: 46px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    line-height: 1.05;
+  }
+  .hero__big {
+    font-size: 146px;
+    font-weight: 900;
+    /* line-height ≥ 1 + padding-bottom: el descendente de la "g" (Miguel) lo
+       recorta background-clip:text cuando la caja de línea es más baja que el glifo. */
+    line-height: 1.06;
+    padding-bottom: 0.08em;
+    letter-spacing: -5px;
+    margin-top: 0;
+    background: linear-gradient(120deg, #6BB5FF 0%, #4A90D9 60%, #8FC7FF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 10px 38px rgba(74,144,217,0.45));
+  }
+  .hero__sub {
+    margin-top: 22px;
+    font-size: 35px;
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: -0.4px;
+    max-width: 760px;
+  }
+  .hero__sub .soft { color: var(--text-dim); font-weight: 500; }
+  .hero__note {
+    margin-top: 16px;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-dim);
+    line-height: 1.4;
+    max-width: 720px;
+  }
+
+  /* ---- Bloque precio ---- */
+  .price {
+    margin-top: 38px;
+    position: relative; z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 30px 34px;
+    border-radius: 26px;
+    background: linear-gradient(135deg, rgba(27,40,56,0.92), rgba(15,25,35,0.78));
+    border: 1px solid rgba(106,181,255,0.28);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.42), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  }
+  .price__tag {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+  }
+  .price__plan {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent-light);
+    margin-bottom: 10px;
+  }
+  .price__amount { display: flex; align-items: baseline; gap: 8px; }
+  .price__num {
+    font-size: 104px;
+    font-weight: 900;
+    letter-spacing: -3px;
+    line-height: 0.9;
+    background: linear-gradient(120deg, #FFFFFF 0%, #BFE0FF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .price__per { font-size: 30px; font-weight: 700; color: var(--text-dim); }
+  .price__divider { width: 1px; align-self: stretch; background: rgba(255,255,255,0.10); }
+  .price__perks { display: flex; flex-direction: column; gap: 11px; }
+  .price__perk {
+    display: flex; align-items: center; gap: 11px;
+    font-size: 20px; font-weight: 600; color: var(--text);
+  }
+  .price__perk svg { width: 22px; height: 22px; flex-shrink: 0; color: #5BD6A0; }
+
+  /* ---- Features ---- */
+  .feats {
+    margin-top: 24px;
+    position: relative; z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 28px;
+  }
+  .feat {
+    display: flex; align-items: center; gap: 13px;
+    font-size: 21px; font-weight: 600; color: var(--text);
+  }
+  .feat__ico {
+    flex-shrink: 0;
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    display: grid; place-items: center;
+    background: rgba(74,144,217,0.16);
+    border: 1px solid rgba(106,181,255,0.28);
+    color: var(--accent-light);
+  }
+  .feat__ico svg { width: 20px; height: 20px; }
+
+  /* ---- Cierre / contacto ---- */
+  .bottom {
+    margin-top: auto;
+    position: relative; z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding-top: 28px;
+  }
+  /* "Pedí la tuya" — texto plano, sin estilo de botón */
+  .bottom__lead {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--accent-light);
+  }
+  .bottom__lead svg { width: 24px; height: 24px; }
+  .bottom__big {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -1px;
+    color: var(--text);
+  }
+  .bottom__sub {
+    font-size: 29px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: -0.2px;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="orb orb--ring"></div>
+    <div class="orb orb--dot"></div>
+    <div class="grain"></div>
+
+    <!-- Top -->
+    <div class="top">
+      <img class="logo" src="file:///Users/rodrigoproko/MeridianSoftware/public/logo.png" alt="Meridian Software" />
+      <span class="urgency"><svg class="urgency__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Por tiempo limitado</span>
+    </div>
+
+    <!-- Zonas -->
+    <span class="zones">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span><b>San Miguel</b> · <b>Bella Vista</b> · <b>Muñiz</b></span>
+    </span>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero__pre">Si sos de</div>
+      <div class="hero__big">San Miguel</div>
+      <div class="hero__sub">tu negocio necesita una web profesional<span class="soft"> — y esta promo es solo para los vecinos de la zona.</span></div>
+      <div class="hero__note">La diseñamos, la publicamos y la mantenemos por vos. Vos te ocupás de tu negocio.</div>
+    </div>
+
+    <!-- Precio -->
+    <div class="price">
+      <div class="price__tag">
+        <span class="price__plan">Plan Vecino</span>
+        <span class="price__amount">
+          <span class="price__num">$6.499</span>
+          <span class="price__per">/mes</span>
+        </span>
+      </div>
+      <div class="price__divider"></div>
+      <div class="price__perks">
+        <span class="price__perk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sin costo de desarrollo</span>
+        <span class="price__perk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sin permanencia</span>
+        <span class="price__perk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Cancelás cuando quieras</span>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="feats">
+      <span class="feat"><span class="feat__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>Diseño a medida</span>
+      <span class="feat"><span class="feat__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>Tienda online</span>
+      <span class="feat"><span class="feat__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>Aparecés en Google</span>
+      <span class="feat"><span class="feat__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Botón de WhatsApp</span>
+    </div>
+
+    <!-- Cierre / contacto -->
+    <div class="bottom">
+      <span class="bottom__lead">Pedí la tuya <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="bottom__big">Escribinos por DM</div>
+      <div class="bottom__sub">o tocá el link de la bio</div>
+    </div>
+  </div>
+</body>
+</html>

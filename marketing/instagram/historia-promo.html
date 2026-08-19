@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<!--
+  Historia de Instagram (story 9:16 → 1080×1920) — pieza EVERGREEN de la promo.
+  Oferta actual (src/PromotionalSection): Plan Vecino, web profesional para
+  vecinos de San Miguel, $34.999/mes, sin permanencia. Tema azul de marca
+  (no la urgencia coral de las piezas de "últimos días", cuyo deadline ya venció).
+  Safe zones IG respetadas: ~180px arriba (perfil) y ~230px abajo (responder).
+  Render: Chrome headless DPR 2 → 2160×3840, luego sips a 1080×1920.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #4A90D9;
+    --accent-light: #6BB5FF;
+    --accent-hi: #BFE0FF;
+    --surface: #0F1923;
+    --text: #F0EBE3;
+    --text-dim: #94A6B8;
+    --ok: #5BD6A0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px; height: 1920px;
+    overflow: hidden;
+    background:
+      radial-gradient(90% 55% at 88% 4%, rgba(107,181,255,0.28) 0%, rgba(107,181,255,0) 56%),
+      radial-gradient(96% 58% at 10% 2%, rgba(74,144,217,0.30) 0%, rgba(74,144,217,0) 58%),
+      radial-gradient(95% 55% at 50% 105%, rgba(74,144,217,0.18) 0%, rgba(74,144,217,0) 60%),
+      linear-gradient(168deg, #0E1B27 0%, #13253A 52%, #0A1520 100%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    padding: 176px 84px 196px;
+  }
+  .orb { position: absolute; border-radius: 50%; pointer-events: none; }
+  .orb--ring {
+    top: -170px; right: -190px; width: 560px; height: 560px;
+    border: 2px solid rgba(107,181,255,0.22);
+    box-shadow: 0 0 140px rgba(74,144,217,0.20) inset;
+  }
+  .orb--ring2 {
+    bottom: -250px; left: -210px; width: 620px; height: 620px;
+    border: 2px solid rgba(107,181,255,0.13);
+    box-shadow: 0 0 140px rgba(74,144,217,0.18) inset;
+  }
+  .grain {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.013) 0 1px, transparent 1px 3px);
+  }
+
+  /* ---- Top ---- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; z-index: 2;
+  }
+  .logo { height: 52px; width: auto; display: block; }
+  .plan-pill {
+    display: inline-flex; align-items: center; gap: 11px;
+    padding: 13px 24px; border-radius: 9999px;
+    background: rgba(107,181,255,0.14);
+    border: 1px solid rgba(107,181,255,0.5);
+    color: var(--accent-hi);
+    font-size: 20px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
+  }
+  .plan-pill svg { width: 20px; height: 20px; }
+
+  /* ---- Hero ---- */
+  .head { margin-top: 96px; position: relative; z-index: 2; }
+  .h-title {
+    font-size: 108px; font-weight: 900; line-height: 0.98; letter-spacing: -3.5px;
+    color: var(--text);
+  }
+  .h-title .grad {
+    background: linear-gradient(116deg, #6BB5FF 0%, #BFE0FF 60%, #A9D4FF 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 12px 40px rgba(74,144,217,0.34));
+  }
+  .h-sub {
+    margin-top: 34px;
+    font-size: 39px; font-weight: 500; line-height: 1.3; letter-spacing: -0.4px;
+    color: var(--text-dim); max-width: 880px;
+  }
+  .h-sub b { color: var(--text); font-weight: 700; }
+
+  /* ---- Price ---- */
+  .price {
+    margin-top: 52px; position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: 38px 44px 34px; border-radius: 30px;
+    background: linear-gradient(135deg, rgba(28,44,64,0.94), rgba(14,26,38,0.74));
+    border: 1px solid rgba(107,181,255,0.24);
+    box-shadow: 0 26px 60px rgba(0,0,0,0.42);
+  }
+  .price__label {
+    font-size: 24px; font-weight: 800; letter-spacing: 2.4px; text-transform: uppercase;
+    color: var(--accent-light);
+  }
+  .price__amount {
+    margin-top: 10px; line-height: 0.9;
+    font-size: 130px; font-weight: 900; letter-spacing: -4px;
+    background: linear-gradient(118deg, #FFFFFF 0%, #BFE0FF 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .price__amount small { font-size: 46px; font-weight: 800; color: var(--text-dim); letter-spacing: 0; margin-left: 4px; }
+  .price__notes {
+    align-self: stretch; margin-top: 30px;
+    display: flex; gap: 15px 48px; flex-wrap: wrap;
+    padding-top: 26px; border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .price__note { display: flex; align-items: center; gap: 13px; font-size: 28px; font-weight: 700; color: var(--text); }
+  .price__note svg { width: 27px; height: 27px; color: var(--ok); flex-shrink: 0; }
+  .price__note span { font-weight: 600; color: var(--text-dim); }
+
+  /* ---- Features 2x2 ---- */
+  .feats {
+    margin-top: 40px; position: relative; z-index: 2;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+  .feat {
+    display: flex; align-items: center; gap: 20px;
+    padding: 28px 30px; border-radius: 24px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .feat__ic {
+    width: 66px; height: 66px; border-radius: 18px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(107,181,255,0.24), rgba(74,144,217,0.14));
+    border: 1px solid rgba(107,181,255,0.3);
+    color: var(--accent-hi);
+  }
+  .feat__ic svg { width: 36px; height: 36px; }
+  .feat__tx { font-size: 30px; font-weight: 700; line-height: 1.14; letter-spacing: -0.4px; color: var(--text); }
+
+  /* ---- Bottom cluster (cierre) ---- */
+  .bottom {
+    margin-top: auto; padding-top: 48px; position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+
+  /* ---- Cierre (tagline informativo, sin CTA ni interacción) ---- */
+  .foot { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .foot__rule { width: 96px; height: 4px; border-radius: 999px; background: linear-gradient(90deg, #4A90D9, #6BB5FF); }
+  .foot__tagline {
+    font-size: 46px; font-weight: 800; line-height: 1.18; letter-spacing: -1px;
+    color: var(--text); max-width: 840px;
+  }
+  .foot__tagline .grad {
+    background: linear-gradient(116deg, #6BB5FF, #BFE0FF);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="orb orb--ring"></div>
+    <div class="orb orb--ring2"></div>
+    <div class="grain"></div>
+
+    <!-- Top -->
+    <div class="top">
+      <img class="logo" src="file:///Users/rodrigoproko/MeridianSoftware/public/logo.png" alt="Meridian Software" />
+      <span class="plan-pill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5z"/></svg>
+        Plan Web
+      </span>
+    </div>
+
+    <!-- Hero -->
+    <div class="head">
+      <h1 class="h-title">Tu web<br/>profesional,<br/><span class="grad">sin vueltas</span></h1>
+      <p class="h-sub">La <b>diseñamos, publicamos y mantenemos</b> por vos. Vos te dedicás a tu negocio.</p>
+    </div>
+
+    <!-- Price -->
+    <div class="price">
+      <span class="price__label">Cuota mensual</span>
+      <span class="price__amount">$34.999<small>/mes</small></span>
+      <div class="price__notes">
+        <span class="price__note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Sin costo de desarrollo
+        </span>
+        <span class="price__note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Sin permanencia <span>· cancelás cuando quieras</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Features 2x2 -->
+    <div class="feats">
+      <div class="feat">
+        <span class="feat__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+        <span class="feat__tx">Diseño<br/>a medida</span>
+      </div>
+      <div class="feat">
+        <span class="feat__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
+        <span class="feat__tx">Perfecta en<br/>el celular</span>
+      </div>
+      <div class="feat">
+        <span class="feat__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+        <span class="feat__tx">Aparecés<br/>en Google</span>
+      </div>
+      <div class="feat">
+        <span class="feat__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="feat__tx">Botón de<br/>WhatsApp</span>
+      </div>
+    </div>
+
+    <!-- Cierre: tagline informativo (sin botones ni interacción) -->
+    <div class="bottom">
+      <div class="foot">
+        <span class="foot__rule"></span>
+        <span class="foot__tagline">Webs profesionales para<br/><span class="grad">negocios o emprendimientos</span></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

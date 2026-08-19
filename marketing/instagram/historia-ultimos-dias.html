@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<!--
+  Historia de Instagram (story 9:16 → 1080×1920) para la promo de webs
+  (vecinos de San Miguel, $6.499/mes, vence 6/6/2026).
+  Urgencia "Solo quedan 3 días" + hueco para el sticker de cuenta regresiva de IG.
+  Tokens de marca: src/styles/variables.css. Render: Chrome headless DPR 2.
+  Safe zones IG: ~220px arriba (perfil) y ~250px abajo (responder) quedan libres.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #4A90D9;
+    --accent-light: #6BB5FF;
+    --surface: #0F1923;
+    --text: #F0EBE3;
+    --text-dim: #94A6B8;
+    --amber: #FFB463;
+    --amber-hi: #FFD27D;
+    --amber-lo: #FF9A52;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px; height: 1920px;
+    overflow: hidden;
+    background:
+      radial-gradient(80% 50% at 86% 6%, rgba(255,154,82,0.22) 0%, rgba(255,154,82,0) 55%),
+      radial-gradient(95% 60% at 12% 4%, rgba(74,144,217,0.30) 0%, rgba(74,144,217,0) 58%),
+      radial-gradient(90% 55% at 50% 104%, rgba(74,144,217,0.18) 0%, rgba(74,144,217,0) 60%),
+      linear-gradient(168deg, #0F1C28 0%, #16283C 50%, #0B1622 100%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    padding: 168px 88px 150px;
+  }
+  .orb { position: absolute; border-radius: 50%; pointer-events: none; }
+  .orb--ring {
+    top: -150px; right: -180px; width: 540px; height: 540px;
+    border: 2px solid rgba(255,180,99,0.18);
+    box-shadow: 0 0 130px rgba(255,154,82,0.16) inset;
+  }
+  .orb--ring2 {
+    bottom: -240px; left: -200px; width: 600px; height: 600px;
+    border: 2px solid rgba(106,181,255,0.14);
+    box-shadow: 0 0 130px rgba(74,144,217,0.18) inset;
+  }
+  .grain {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.013) 0 1px, transparent 1px 3px);
+  }
+
+  /* ---- Top ---- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; z-index: 2;
+  }
+  .logo { height: 50px; width: auto; display: block; }
+  .urgent-pill {
+    display: inline-flex; align-items: center; gap: 11px;
+    padding: 13px 24px; border-radius: 9999px;
+    background: rgba(255,154,82,0.14);
+    border: 1px solid rgba(255,180,99,0.5);
+    color: var(--amber-hi);
+    font-size: 19px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .urgent-pill svg { width: 21px; height: 21px; }
+
+  /* ---- Hero ---- */
+  .head { margin-top: 96px; position: relative; z-index: 2; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--amber);
+  }
+  .h-pre {
+    margin-top: 22px;
+    font-size: 86px; font-weight: 800; line-height: 0.98; letter-spacing: -2px;
+    color: var(--text);
+  }
+  .h-big {
+    margin-top: 4px;
+    font-size: 232px; font-weight: 900; line-height: 0.9; letter-spacing: -8px;
+    background: linear-gradient(118deg, #FFD27D 0%, #FF9A52 52%, #FFC56B 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 14px 44px rgba(255,138,68,0.34));
+  }
+  .h-big small { font-size: 120px; letter-spacing: -4px; }
+  .question {
+    margin-top: 40px;
+    font-size: 44px; font-weight: 600; line-height: 1.28; letter-spacing: -0.6px;
+    color: var(--text); max-width: 880px;
+  }
+  .question b {
+    font-weight: 800;
+    background: linear-gradient(120deg, #6BB5FF, #BFE0FF);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* ---- Hueco para la cuenta regresiva de IG ---- */
+  .mid {
+    flex: 1; position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .countdown-slot {
+    width: 684px; height: 344px; border-radius: 36px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    background:
+      radial-gradient(120% 120% at 50% 0%, rgba(255,154,82,0.10), rgba(255,154,82,0) 70%),
+      rgba(255,255,255,0.025);
+    border: 3px dashed rgba(255,180,99,0.55);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset, 0 30px 70px rgba(0,0,0,0.32);
+  }
+  .countdown-slot__icon {
+    width: 78px; height: 78px; border-radius: 22px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #FFD27D, #FF9A52); color: #2a1605;
+    box-shadow: 0 12px 30px rgba(255,154,82,0.4);
+  }
+  .countdown-slot__icon svg { width: 44px; height: 44px; }
+  .countdown-slot__label { font-size: 34px; font-weight: 800; letter-spacing: -0.4px; color: var(--text); }
+  .countdown-slot__hint {
+    font-size: 22px; font-weight: 600; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 9px;
+  }
+  .countdown-slot__hint svg { width: 22px; height: 22px; opacity: 0.9; }
+
+  /* ---- Recap de la oferta ---- */
+  .offer {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 26px;
+    padding: 30px 36px; border-radius: 28px;
+    background: linear-gradient(135deg, rgba(27,40,56,0.92), rgba(15,25,35,0.72));
+    border: 1px solid rgba(106,181,255,0.2);
+    box-shadow: 0 24px 56px rgba(0,0,0,0.4);
+  }
+  .offer__price { display: flex; flex-direction: column; line-height: 1; }
+  .offer__amount {
+    font-size: 72px; font-weight: 900; letter-spacing: -2.5px;
+    background: linear-gradient(120deg, #FFFFFF, #BFE0FF);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .offer__period { font-size: 24px; font-weight: 700; color: var(--text-dim); margin-top: 8px; }
+  .offer__sep { width: 1px; height: 86px; background: rgba(255,255,255,0.12); }
+  .offer__desc { display: flex; flex-direction: column; gap: 8px; }
+  .offer__line { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 700; color: var(--text); }
+  .offer__line svg { width: 24px; height: 24px; color: #5BD6A0; flex-shrink: 0; }
+  .offer__line span { font-weight: 600; color: var(--text-dim); }
+  .offer__line--stack { align-items: flex-start; }
+  .offer__line--stack svg { margin-top: 4px; }
+  .offer__line--stack .offer__col { display: flex; flex-direction: column; gap: 3px; line-height: 1.16; font-weight: 700; color: var(--text); }
+  .offer__line--stack .offer__col span { font-size: 23px; font-weight: 600; color: var(--text-dim); }
+
+  /* ---- Bottom CTA ---- */
+  .foot {
+    margin-top: 34px; position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  }
+  .foot__cta {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-size: 38px; font-weight: 900; letter-spacing: -0.6px; color: var(--text);
+  }
+  .foot__cta svg { width: 34px; height: 34px; color: var(--amber); }
+  .foot__sub { font-size: 23px; font-weight: 600; color: var(--text-dim); }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="orb orb--ring"></div>
+    <div class="orb orb--ring2"></div>
+    <div class="grain"></div>
+
+    <!-- Top -->
+    <div class="top">
+      <img class="logo" src="file:///Users/rodrigoproko/MeridianSoftware/public/logo.png" alt="Meridian Software" />
+      <span class="urgent-pill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>
+        Oferta por tiempo limitado
+      </span>
+    </div>
+
+    <!-- Hero -->
+    <div class="head">
+      <span class="eyebrow">La promo termina pronto</span>
+      <div class="h-pre">Solo quedan</div>
+      <div class="h-big">3 <small>DÍAS</small></div>
+      <p class="question">¿Qué estás esperando para <b>aprovechar esta oferta?</b></p>
+    </div>
+
+    <!-- Hueco para el sticker de cuenta regresiva de Instagram -->
+    <div class="mid">
+      <div class="countdown-slot">
+        <span class="countdown-slot__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
+        </span>
+        <span class="countdown-slot__label">Cuenta regresiva acá</span>
+        <span class="countdown-slot__hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          Pegá el sticker de Instagram
+        </span>
+      </div>
+    </div>
+
+    <!-- Recap de la oferta -->
+    <div class="offer">
+      <div class="offer__price">
+        <span class="offer__amount">$6.499</span>
+        <span class="offer__period">por mes</span>
+      </div>
+      <div class="offer__sep"></div>
+      <div class="offer__desc">
+        <span class="offer__line">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Tu web profesional, lista
+        </span>
+        <span class="offer__line offer__line--stack">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span class="offer__col">Sin permanencia<span>cancelás cuando quieras</span></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="foot">
+      <span class="foot__cta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        Deslizá y empezá hoy
+      </span>
+      <span class="foot__sub">Webs para vecinos de San Miguel</span>
+    </div>
+  </div>
+</body>
+</html>

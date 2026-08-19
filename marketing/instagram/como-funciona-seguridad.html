@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<!--
+  Pieza explainer para Instagram (feed 4:5 → 1080×1350).
+  Explica el funcionamiento de la web principal (Meridian) + por qué iniciar
+  sesión + la seguridad (Google/Apple OAuth, App Check, reCAPTCHA, reglas por-uid).
+  Tokens de marca: src/styles/variables.css. Render: Chrome headless DPR 2.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #4A90D9;
+    --accent-light: #6BB5FF;
+    --surface: #0F1923;
+    --text: #F0EBE3;
+    --text-dim: #94A6B8;
+    --green: #5BD6A0;
+    --green-light: #86EFC2;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1350px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px; height: 1350px;
+    overflow: hidden;
+    background:
+      radial-gradient(115% 75% at 84% -6%, rgba(74,144,217,0.30) 0%, rgba(74,144,217,0) 55%),
+      radial-gradient(90% 70% at -5% 105%, rgba(91,214,160,0.14) 0%, rgba(91,214,160,0) 60%),
+      linear-gradient(158deg, #0F1C28 0%, #16283C 52%, #0B1622 100%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    padding: 70px 76px 60px;
+  }
+  .orb {
+    position: absolute; border-radius: 50%; pointer-events: none;
+  }
+  .orb--ring {
+    top: -200px; right: -170px; width: 520px; height: 520px;
+    border: 2px solid rgba(106,181,255,0.16);
+    box-shadow: 0 0 120px rgba(74,144,217,0.22) inset;
+  }
+  .grain {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.013) 0 1px, transparent 1px 3px);
+  }
+
+  /* ---- Top ---- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; z-index: 2;
+  }
+  .logo { height: 42px; width: auto; display: block; }
+  .safe-pill {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 20px; border-radius: 9999px;
+    background: rgba(91,214,160,0.13);
+    border: 1px solid rgba(91,214,160,0.45);
+    color: var(--green-light);
+    font-size: 16px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .safe-pill svg { width: 18px; height: 18px; }
+
+  /* ---- Título ---- */
+  .head { margin-top: 46px; position: relative; z-index: 2; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 18px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent-light);
+  }
+  .title {
+    margin-top: 14px;
+    font-size: 64px; font-weight: 900; line-height: 1.04; letter-spacing: -1.8px;
+    max-width: 880px;
+  }
+  .title .grad {
+    background: linear-gradient(120deg, #6BB5FF 0%, #4A90D9 60%, #8FC7FF 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle {
+    margin-top: 18px;
+    font-size: 24px; font-weight: 500; line-height: 1.42; color: var(--text-dim);
+    max-width: 800px;
+  }
+
+  /* ---- Pasos ---- */
+  .steps {
+    margin-top: 34px; position: relative; z-index: 2;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .step {
+    display: flex; align-items: center; gap: 20px;
+    padding: 18px 22px; border-radius: 18px;
+    background: linear-gradient(135deg, rgba(27,40,56,0.78), rgba(15,25,35,0.55));
+    border: 1px solid rgba(106,181,255,0.16);
+  }
+  .step__num {
+    flex-shrink: 0;
+    width: 54px; height: 54px; border-radius: 14px;
+    display: grid; place-items: center;
+    font-size: 28px; font-weight: 900; color: #06121f;
+    background: linear-gradient(135deg, #4A90D9, #6BB5FF);
+    box-shadow: 0 8px 22px rgba(74,144,217,0.34);
+  }
+  .step__ico { flex-shrink: 0; width: 30px; height: 30px; color: var(--accent-light); }
+  .step__txt { display: flex; flex-direction: column; gap: 3px; }
+  .step__title { font-size: 25px; font-weight: 800; letter-spacing: -0.3px; }
+  .step__desc { font-size: 19px; font-weight: 500; color: var(--text-dim); line-height: 1.3; }
+
+  /* ---- Seguridad ---- */
+  .sec {
+    margin-top: 26px; position: relative; z-index: 2;
+    padding: 28px 30px; border-radius: 24px;
+    background:
+      radial-gradient(120% 100% at 100% 0%, rgba(91,214,160,0.12), rgba(91,214,160,0) 60%),
+      linear-gradient(135deg, rgba(27,40,56,0.92), rgba(15,25,35,0.7));
+    border: 1px solid rgba(91,214,160,0.34);
+    box-shadow: 0 24px 56px rgba(0,0,0,0.40);
+  }
+  .sec__head { display: flex; align-items: center; gap: 14px; }
+  .sec__shield {
+    flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #34C88A, #5BD6A0); color: #052016;
+    box-shadow: 0 8px 22px rgba(52,200,138,0.34);
+  }
+  .sec__shield svg { width: 29px; height: 29px; }
+  .sec__title { font-size: 30px; font-weight: 900; letter-spacing: -0.6px; }
+  .sec__why { font-size: 19px; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+  .sec__list { margin-top: 22px; display: flex; flex-direction: column; gap: 16px; }
+  .sec__item { display: flex; align-items: flex-start; gap: 15px; }
+  .sec__check {
+    flex-shrink: 0; width: 30px; height: 30px; margin-top: 1px; border-radius: 9px;
+    display: grid; place-items: center;
+    background: rgba(91,214,160,0.16); border: 1px solid rgba(91,214,160,0.4);
+    color: var(--green-light);
+  }
+  .sec__check svg { width: 18px; height: 18px; }
+  .sec__item-txt b { font-size: 21px; font-weight: 800; color: var(--text); }
+  .sec__item-txt span { font-size: 19px; font-weight: 500; color: var(--text-dim); }
+
+  /* ---- CTA ---- */
+  .cta {
+    margin-top: auto; position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 6px; padding-top: 26px;
+  }
+  .cta__lead { font-size: 23px; font-weight: 600; color: var(--text-dim); }
+  .cta__big {
+    font-size: 40px; font-weight: 900; letter-spacing: -0.8px;
+    background: linear-gradient(120deg, #FFFFFF, #BFE0FF);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="orb orb--ring"></div>
+    <div class="grain"></div>
+
+    <!-- Top -->
+    <div class="top">
+      <img class="logo" src="file:///Users/rodrigoproko/MeridianSoftware/public/logo.png" alt="Meridian Software" />
+      <span class="safe-pill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/></svg>
+        100% Seguro
+      </span>
+    </div>
+
+    <!-- Título -->
+    <div class="head">
+      <span class="eyebrow">Cómo funciona la web</span>
+      <h1 class="title">Explorá, ingresá y <span class="grad">probá gratis</span></h1>
+      <p class="subtitle">Conocé nuestros productos, iniciá sesión y activá tu demo de 7 días. Sin tarjeta, sin vueltas.</p>
+    </div>
+
+    <!-- Pasos -->
+    <div class="steps">
+      <div class="step">
+        <span class="step__num">1</span>
+        <svg class="step__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
+        <span class="step__txt">
+          <span class="step__title">Explorá los productos</span>
+          <span class="step__desc">Stock Manager, Medicus y soluciones a medida.</span>
+        </span>
+      </div>
+      <div class="step">
+        <span class="step__num">2</span>
+        <svg class="step__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+        <span class="step__txt">
+          <span class="step__title">Iniciá sesión</span>
+          <span class="step__desc">Con Google o Apple. Un toque, sin contraseñas.</span>
+        </span>
+      </div>
+      <div class="step">
+        <span class="step__num">3</span>
+        <svg class="step__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16"/></svg>
+        <span class="step__txt">
+          <span class="step__title">Activá tu demo</span>
+          <span class="step__desc">7 días gratis. Tu cuenta y tus demos, siempre con vos.</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Seguridad -->
+    <div class="sec">
+      <div class="sec__head">
+        <span class="sec__shield">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <div>
+          <div class="sec__title">Iniciar sesión es seguro</div>
+          <div class="sec__why">Te pedimos tu cuenta para darte tus demos y proteger tus datos.</div>
+        </div>
+      </div>
+      <div class="sec__list">
+        <div class="sec__item">
+          <span class="sec__check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span class="sec__item-txt"><b>Sin contraseñas.</b> <span>Entrás con Google o Apple — tu identidad la protegen ellos.</span></span>
+        </div>
+        <div class="sec__item">
+          <span class="sec__check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span class="sec__item-txt"><b>Blindado contra bots.</b> <span>App Check y reCAPTCHA validan cada acceso a la app.</span></span>
+        </div>
+        <div class="sec__item">
+          <span class="sec__check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span class="sec__item-txt"><b>Tus datos, solo tuyos.</b> <span>Protegidos en Google Cloud; cada cuenta ve únicamente lo suyo.</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta">
+      <span class="cta__lead">Entrá a nuestra web e iniciá sesión</span>
+      <span class="cta__big">Probalo gratis hoy</span>
+    </div>
+  </div>
+</body>
+</html>
