@@ -21,26 +21,12 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { dummy, getLastAuthorized, requestCAE } = require('./wsfe');
 const { readSecret, writeSecret, assertBusinessOwner } = require('./store');
-const { CBTE_TIPO, DOC_TIPO, CONCEPTO, IVA_ID } = require('./config');
+const { CBTE_TIPO } = require('./config');
+const { buildVoucherRequest, formatVoucherNumber, parseAfipDate } = require('./voucher');
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
 const AFIPSDK_SECRET = defineSecret('AFIPSDK_ACCESS_TOKEN');
-
-// CondicionIVAReceptorId (RG 5616 — sept 2024). Códigos AFIP.
-const COND_IVA_RECEPTOR = {
-  RI:                    1,   // Responsable Inscripto
-  EXENTO:                4,   // IVA Sujeto Exento
-  CONSUMIDOR_FINAL:      5,
-  MONOTRIBUTO:           6,   // Responsable Monotributo
-  NO_CATEGORIZADO:       7,   // Sujeto No Categorizado / No Responsable
-  PROVEEDOR_EXTERIOR:    8,
-  CLIENTE_EXTERIOR:      9,
-  IVA_LIBERADO:          10,
-  MONOTRIBUTO_SOCIAL:    13,
-  IVA_NO_ALCANZADO:      15,
-  MT_PROMOVIDO:          16,
-};
 
 // ============================================================
 // saveAfipConfig (modo manual)
@@ -395,85 +381,19 @@ exports.requestAfipCAE = onCall({ secrets: [AFIPSDK_SECRET], timeoutSeconds: 120
   if (!invSnap.exists) throw new HttpsError('not-found', 'Factura no encontrada');
   const inv = invSnap.data();
   if (inv.cae)      throw new HttpsError('failed-precondition', 'La factura ya tiene CAE');
-  if (inv.type === 'X') throw new HttpsError('failed-precondition', 'Tipo X es interno (no AFIP)');
 
-  const cbteTipo = resolveCbteTipo(inv.type);
-  if (!cbteTipo) throw new HttpsError('invalid-argument', `Tipo no soportado: ${inv.type}`);
-
-  // Identificar receptor: DocTipo + DocNro
-  const cli = inv.clientSnapshot || {};
-  let docTipo = DOC_TIPO.CONSUMIDOR_FINAL;
-  let docNro = 0;
-  if (cli.taxId) {
-    const cleanDoc = String(cli.taxId).replace(/[^0-9]/g, '');
-    const typeStr = String(cli.taxIdType || '').toUpperCase();
-    if (typeStr === 'CUIL')      docTipo = DOC_TIPO.CUIL;
-    else if (typeStr === 'DNI')  docTipo = DOC_TIPO.DNI;
-    else if (cleanDoc.length === 11) docTipo = DOC_TIPO.CUIT;
-    else if (cleanDoc.length === 8 || cleanDoc.length === 7) docTipo = DOC_TIPO.DNI;
-    else docTipo = DOC_TIPO.CUIT;
-    docNro = Number(cleanDoc) || 0;
+  // Toda la traducción factura → request WSFE es pura y está testeada en voucher.js
+  let voucherReq;
+  try {
+    voucherReq = buildVoucherRequest(inv, secret);
+  } catch (err) {
+    throw new HttpsError('failed-precondition', err.message);
   }
-  if (inv.type === 'A' && (docTipo !== DOC_TIPO.CUIT || !docNro)) {
-    throw new HttpsError('invalid-argument', 'Factura A requiere CUIT del receptor');
-  }
+  const { cbte, condicionIVAReceptorId, cbteTipo } = voucherReq;
 
-  // CondicionIVAReceptorId (RG 5616)
-  const condicionIVAReceptorId = mapReceptorCondition(cli.taxCondition, docNro);
+  const { cae, caeFchVto, cbteNro, obs } = await requestCAE(businessId, cbte, condicionIVAReceptorId);
 
-  // Importes
-  const subtotal = Number(inv.subtotal || 0);
-  const taxTotal = Number(inv.taxTotal || 0);
-  const total    = Number(inv.total || 0);
-
-  let impNeto = subtotal;
-  let impIVA  = taxTotal;
-  let ivaArray = [];
-
-  if (inv.type === 'C') {
-    // Monotributo: no discrimina IVA — todo va en ImpNeto
-    impNeto = total;
-    impIVA = 0;
-  } else {
-    const byRate = new Map();
-    (inv.lineItems || []).forEach(it => {
-      const rate = Number(it.taxRate || 0);
-      const cur = byRate.get(rate) || { baseImp: 0, importe: 0 };
-      cur.baseImp += Number(it.subtotal || 0);
-      cur.importe += Number(it.taxAmount || 0);
-      byRate.set(rate, cur);
-    });
-    ivaArray = Array.from(byRate.entries())
-      .filter(([rate]) => IVA_ID[String(rate)] !== undefined)
-      .map(([rate, v]) => ({
-        id: IVA_ID[String(rate)],
-        baseImp: round2(v.baseImp),
-        importe: round2(v.importe),
-      }));
-  }
-
-  const today = new Date();
-  const cbteFch = `${today.getFullYear()}${pad2(today.getMonth() + 1)}${pad2(today.getDate())}`;
-
-  const { cae, caeFchVto, cbteNro, obs } = await requestCAE(businessId, {
-    ptoVta: secret.pointOfSale,
-    cbteTipo,
-    concepto: CONCEPTO.PRODUCTOS,
-    docTipo,
-    docNro,
-    cbteFch,
-    impTotal: round2(total),
-    impNeto:  round2(impNeto),
-    impIVA:   round2(impIVA),
-    impTotConc: 0,
-    impOpEx: 0,
-    impTrib: 0,
-    moneda:   inv.currency === 'ARS' ? 'PES' : (inv.currency || 'PES'),
-    monCotiz: 1,
-    iva: ivaArray,
-  }, condicionIVAReceptorId);
-
-  const newNumberStr = `${pad4(secret.pointOfSale)}-${pad8(cbteNro)}`;
+  const newNumberStr = formatVoucherNumber(secret.pointOfSale, cbteNro);
   await invRef.update({
     cae,
     caeExpiresAt: parseAfipDate(caeFchVto),
@@ -511,36 +431,3 @@ async function assertOwnerOrThrow(businessId, uid) {
   }
 }
 
-function resolveCbteTipo(type) {
-  if (type === 'A') return CBTE_TIPO.FACTURA_A;
-  if (type === 'B') return CBTE_TIPO.FACTURA_B;
-  if (type === 'C') return CBTE_TIPO.FACTURA_C;
-  return null;
-}
-
-/**
- * Mapea la condición fiscal del receptor (string libre) al código AFIP
- * para CondicionIVAReceptorId (RG 5616). Default = Consumidor Final.
- */
-function mapReceptorCondition(taxCondition, docNro) {
-  const c = String(taxCondition || '').toLowerCase();
-  if (c.includes('responsable inscripto')) return COND_IVA_RECEPTOR.RI;
-  if (c.includes('monotrib'))              return COND_IVA_RECEPTOR.MONOTRIBUTO;
-  if (c.includes('exento'))                return COND_IVA_RECEPTOR.EXENTO;
-  if (c.includes('no responsable') ||
-      c.includes('no categorizado'))       return COND_IVA_RECEPTOR.NO_CATEGORIZADO;
-  if (c.includes('consumidor final'))      return COND_IVA_RECEPTOR.CONSUMIDOR_FINAL;
-  // Sin condición declarada: si no hay doc, asumimos CF
-  return docNro ? COND_IVA_RECEPTOR.NO_CATEGORIZADO : COND_IVA_RECEPTOR.CONSUMIDOR_FINAL;
-}
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-function pad4(n) { return String(n).padStart(4, '0'); }
-function pad8(n) { return String(n).padStart(8, '0'); }
-function round2(n) { return Math.round(Number(n) * 100) / 100; }
-
-function parseAfipDate(yyyymmdd) {
-  const s = String(yyyymmdd || '');
-  if (s.length !== 8) return new Date();
-  return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00Z`);
-}

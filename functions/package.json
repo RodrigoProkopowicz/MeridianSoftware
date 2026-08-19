@@ -7,6 +7,8 @@
   },
   "main": "index.js",
   "scripts": {
+    "test": "node --test \"afip/*.test.js\"",
+    "test:arca-e2e": "node scripts/arca-e2e-homologacion.js",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",

@@ -88,6 +88,26 @@ async function requestCAE(businessId, cbte, condicionIVAReceptorId) {
   );
   const cbteNro = Number(last || 0) + 1;
 
+  const data = toWsfeData(cbte, cbteNro, condicionIVAReceptorId);
+
+  // SDK lanza con detalle si AFIP rechaza; si retorna, fue aprobado.
+  const result = await afip.ElectronicBilling.createVoucher(data);
+
+  return {
+    cae: String(result.CAE || ''),
+    caeFchVto: normalizeCaeDate(result.CAEFchVto),
+    cbteNro,
+    resultado: 'A',
+    obs: [],
+  };
+}
+
+/**
+ * Traducción pura cbte → payload FECAESolicitar (campos WSFE). Compartida
+ * entre `requestCAE` y el smoke test E2E contra homologación, para que lo
+ * que se prueba sea exactamente lo que se emite.
+ */
+function toWsfeData(cbte, cbteNro, condicionIVAReceptorId) {
   const data = {
     CantReg: 1,
     PtoVta: Number(cbte.ptoVta),
@@ -117,16 +137,7 @@ async function requestCAE(businessId, cbte, condicionIVAReceptorId) {
     }));
   }
 
-  // SDK lanza con detalle si AFIP rechaza; si retorna, fue aprobado.
-  const result = await afip.ElectronicBilling.createVoucher(data);
-
-  return {
-    cae: String(result.CAE || ''),
-    caeFchVto: normalizeCaeDate(result.CAEFchVto),
-    cbteNro,
-    resultado: 'A',
-    obs: [],
-  };
+  return data;
 }
 
 /**
@@ -148,4 +159,5 @@ module.exports = {
   getLastAuthorized,
   requestCAE,
   getAfipInstance,
+  toWsfeData,
 };
