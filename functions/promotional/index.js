@@ -52,9 +52,20 @@ exports.createPromotionalPreapproval = onCall(
     // (no es requisito).
     const clean = validateAndClean(request.data || {});
 
-    // 1. reCAPTCHA — si hay token y el score es bajo, rechazamos. Si no hay
-    //    token (script no cargó), dejamos pasar pero registramos score null.
-    const assessment = await assessToken(request.data?.recaptchaToken, 'PROMO_SUBSCRIBE');
+    // 1. reCAPTCHA. Tres casos, de menos a más sospechoso:
+    //    - Sin token (el script no cargó / adblocker): dejamos pasar. App Check
+    //      sigue siendo la barrera real; registramos score null.
+    //    - Token presente pero INVÁLIDO (expirado, adulterado, acción distinta):
+    //      un navegador real que ejecutó grecaptcha produce siempre un token
+    //      válido, así que un token inválido señala manipulación → lo rechazamos
+    //      (antes caía como score null y pasaba, dejando la verificación muda).
+    //    - Token válido con score bajo: bot probable → lo rechazamos.
+    const recaptchaToken = request.data?.recaptchaToken;
+    const assessment = await assessToken(recaptchaToken, 'PROMO_SUBSCRIBE');
+    if (recaptchaToken && !assessment.valid) {
+      logger.warn('createPromotionalPreapproval: invalid reCAPTCHA token', assessment);
+      throw new HttpsError('permission-denied', 'No pudimos validar tu solicitud. Probá de nuevo.');
+    }
     if (assessment.score !== null && assessment.score < RECAPTCHA_THRESHOLD) {
       logger.warn('createPromotionalPreapproval: low reCAPTCHA score', assessment);
       throw new HttpsError('permission-denied', 'No pudimos validar tu solicitud. Probá de nuevo.');
