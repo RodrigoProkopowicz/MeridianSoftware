@@ -58,17 +58,24 @@ service cloud.firestore {
       allow create: if isOwner(uid)
                        && hasOnlyFields(['email','displayName','photoURL','provider','createdAt','lastLoginAt'])
                        && payloadSizeOK();
-      // Owner puede actualizar los campos originales sin tocar `role` ni `admin`
-      // (los mantiene como estaban o ausentes). Admin puede modificar ambos.
-      // `admin` lo escribe la callable createUser/setAdminClaim (Admin SDK) para
-      // que el panel sepa quién es admin; el owner nunca puede cambiarlo.
+      // Owner puede actualizar los campos originales sin tocar `role`, `admin`,
+      // `accountType` ni `employerUid` (los mantiene como estaban o ausentes).
+      // Admin puede modificarlos todos.
+      //   - `admin` lo escribe la callable createUser/setAdminClaim (Admin SDK)
+      //     para que el panel sepa quién es admin.
+      //   - `accountType` distingue la cuenta dueña (la que crea el panel) de
+      //     las de empleado (las crea createBusinessMember). Que el propio
+      //     usuario pudiera cambiarlo sería ascenderse solo: por eso es inmutable
+      //     para él y solo lo escribe el Admin SDK.
       allow update: if (isOwner(uid)
-                         && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin'])
+                         && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin','accountType','employerUid'])
                          && request.resource.data.get('role', null) == resource.data.get('role', null)
                          && request.resource.data.get('admin', null) == resource.data.get('admin', null)
+                         && request.resource.data.get('accountType', null) == resource.data.get('accountType', null)
+                         && request.resource.data.get('employerUid', null) == resource.data.get('employerUid', null)
                          && payloadSizeOK())
                       || (isAdmin()
-                           && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin']));
+                           && request.resource.data.keys().hasOnly(['email','displayName','photoURL','provider','createdAt','lastLoginAt','role','admin','accountType','employerUid']));
       allow delete: if false;
 
       // ---- users/{uid}/demoAccess/{productId} ----
@@ -143,37 +150,142 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId;
     }
 
+    // ---- Equipo del comercio ----
+    // Modelo de cuentas de Stock Manager:
+    //   - El DUEÑO (`businesses/{id}.ownerId`) es la cuenta que crea el panel de
+    //     Meridian. Manda en sus comercios y no necesita doc de miembro.
+    //   - Los EMPLEADOS viven en `businesses/{id}/members/{uid}` con su rol y su
+    //     mapa de permisos. Los crea la callable `createBusinessMember`.
+    //
+    // Estas reglas son el respaldo real de los permisos: la UI esconde lo que
+    // la persona no puede hacer, pero lo que lo impide de verdad es esto.
+    function memberData(businessId) {
+      return get(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid)).data;
+    }
+
+    function isActiveMember(businessId) {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid))
+             && memberData(businessId).get('active', true) == true;
+    }
+
+    // Un empleado con rol admin equivale al dueño puertas adentro del comercio.
+    function memberCan(businessId, permission) {
+      return isActiveMember(businessId)
+             && (memberData(businessId).get('role', 'custom') == 'admin'
+                 || memberData(businessId).get('permissions', {}).get(permission, false) == true);
+    }
+
+    // La pregunta que hace cada colección: ¿esta persona puede esto, acá?
+    function can(businessId, permission) {
+      return isOwner(businessOwner(businessId)) || memberCan(businessId, permission) || isAdmin();
+    }
+
+    // Quién puede mover la CANTIDAD de un producto (y solo la cantidad):
+    //   - el depósito, cargando un movimiento a mano;
+    //   - la venta, al emitir una factura o un remito — descuenta el stock y deja
+    //     el movimiento en la MISMA transacción que el comprobante;
+    //   - la anulación con reversión, que hace el camino inverso.
+    //
+    // Si esas escrituras exigieran `stock.manage`, ni el rol Ventas podría
+    // facturar ni un empleado de depósito sin permiso de editar productos podría
+    // registrar una entrada: en una transacción, una sola operación denegada
+    // tumba todo. Editar precios, nombres o mínimos sigue siendo `stock.manage`.
+    //
+    // No se resuelve llamando `can()` cuatro veces para no multiplicar accesos a
+    // documentos dentro de la evaluación: así toca los mismos dos docs que el resto.
+    function movesStock(businessId) {
+      return isOwner(businessOwner(businessId))
+             || isAdmin()
+             || (isActiveMember(businessId)
+                 && (memberData(businessId).get('role', 'custom') == 'admin'
+                     || memberData(businessId).get('permissions', {}).get('movements.create', false) == true
+                     || memberData(businessId).get('permissions', {}).get('invoices.create', false) == true
+                     || memberData(businessId).get('permissions', {}).get('remitos.create', false) == true
+                     || memberData(businessId).get('permissions', {}).get('invoices.cancel', false) == true));
+    }
+
+    // Cualquiera que trabaje en el comercio (para lo transversal: numeración).
+    function belongsToBusiness(businessId) {
+      return isOwner(businessOwner(businessId)) || isActiveMember(businessId) || isAdmin();
+    }
+
+    // Las cuentas de empleado no crean comercios propios: los suyos son los que
+    // les asigna su administrador.
+    function isEmployeeAccount() {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('accountType', 'owner') == 'employee';
+    }
+
     match /businesses/{businessId} {
-      allow read:   if isOwner(resource.data.ownerId) || isAdmin();
+      // Lo ven su dueño y su equipo (el empleado necesita leer el comercio para
+      // saber su nombre y su moneda).
+      allow read:   if isOwner(resource.data.ownerId) || isActiveMember(businessId) || isAdmin();
       allow create: if (isSignedIn()
+                         && !isEmployeeAccount()
                          && request.resource.data.ownerId == request.auth.uid
                          && request.resource.data.keys().hasOnly(['ownerId','name','currency','createdAt','updatedAt'])
                          && isNonEmptyString(request.resource.data.name, 120)
                          && isNonEmptyString(request.resource.data.currency, 8))
                       || isAdmin();
-      allow update: if (isOwner(resource.data.ownerId)
+      // El dueño no se puede transferir: `ownerId` es inmutable.
+      allow update: if ((isOwner(resource.data.ownerId) || memberCan(businessId, 'business.manage'))
                          && request.resource.data.ownerId == resource.data.ownerId
                          && request.resource.data.size() < 30)
                       || isAdmin();
+      // Borrar el comercio es del dueño y de nadie más.
       allow delete: if isOwner(resource.data.ownerId) || isAdmin();
 
-      // ---- products ----
-      match /products/{productId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
-                         && isNonEmptyString(request.resource.data.name, 200)
-                         && request.resource.data.size() < 30;
-        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
-                         && request.resource.data.size() < 30;
+      // ---- members (equipo del comercio) ----
+      // La cuenta la crea la callable `createBusinessMember` (Admin SDK, se
+      // saltea estas reglas). Desde el cliente solo se editan rol y permisos.
+      match /members/{memberId} {
+        // Cada quien lee su propia membresía (así la app sabe qué puede hacer);
+        // el dueño y quien administra el equipo leen todo el listado.
+        allow read, list: if isSignedIn()
+                             && (memberId == request.auth.uid
+                                 || isOwner(businessOwner(businessId))
+                                 || memberCan(businessId, 'team.manage')
+                                 || isAdmin());
+        // El único create desde el cliente es el del propio dueño al crear el
+        // comercio (queda listado en Equipo). Los empleados los crea la callable.
+        allow create: if (isOwner(businessOwner(businessId)) && memberId == request.auth.uid)
+                         || isAdmin();
+        // Nadie edita su propia membresía: si no, quien administra el equipo se
+        // ascendería a admin de un tilde. El uid tampoco se puede reapuntar.
+        allow update: if ((isOwner(businessOwner(businessId))
+                            || (memberCan(businessId, 'team.manage') && memberId != request.auth.uid))
+                           && request.resource.data.uid == resource.data.uid
+                           && request.resource.data.size() < 15)
+                        || isAdmin();
         allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
       }
 
+      // ---- products ----
+      match /products/{productId} {
+        allow read:   if can(businessId, 'stock.view');
+        allow create: if can(businessId, 'stock.manage')
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 30;
+        // Editar el producto es de `stock.manage`. Quien mueve stock (depósito o
+        // venta) solo puede tocar la cantidad, y nada más.
+        allow update: if (can(businessId, 'stock.manage')
+                           && request.resource.data.size() < 30)
+                        || (movesStock(businessId)
+                            && request.resource.data.diff(resource.data)
+                                 .affectedKeys().hasOnly(['quantity', 'updatedAt']));
+        allow delete: if can(businessId, 'stock.delete');
+      }
+
       // ---- movements ----
-      // Inmutables para el owner (solo create + read). Admin tiene bypass para
-      // soporte: puede update/delete movements de comercios ajenos.
+      // Inmutables para el comercio (solo create + read). Admin tiene bypass
+      // para soporte: puede update/delete movements de comercios ajenos.
+      // `userId == request.auth.uid` deja firmado quién lo cargó, empleado o dueño.
       match /movements/{movementId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'stock.view');
+        // Los carga el depósito a mano, y también la venta al emitir o anular.
+        allow create: if movesStock(businessId)
                          && request.resource.data.userId == request.auth.uid
                          && request.resource.data.size() < 30;
         allow update, delete: if isAdmin();
@@ -181,36 +293,37 @@ service cloud.firestore {
 
       // ---- suppliers ----
       match /suppliers/{supplierId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'suppliers.view');
+        allow create: if can(businessId, 'suppliers.manage')
                          && isNonEmptyString(request.resource.data.name, 200)
                          && request.resource.data.size() < 30;
-        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow update: if can(businessId, 'suppliers.manage')
                          && request.resource.data.size() < 30;
-        allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
+        allow delete: if can(businessId, 'suppliers.manage');
       }
 
       // ---- clients (destinatarios de facturas) ----
       match /clients/{clientId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'clients.view');
+        allow create: if can(businessId, 'clients.manage')
                          && isNonEmptyString(request.resource.data.name, 200)
                          && request.resource.data.size() < 30;
-        allow update: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow update: if can(businessId, 'clients.manage')
                          && request.resource.data.size() < 30;
-        allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
+        allow delete: if can(businessId, 'clients.manage');
       }
 
       // ---- invoices (comprobantes de venta) ----
-      // Las facturas son casi inmutables para el owner: solo se permite cambiar
-      // status / cancelReason (número y totales son inmutables). Admin tiene
-      // bypass total para soporte (incluido delete, que el owner no puede).
+      // Las facturas son casi inmutables: solo se permite cambiar status /
+      // cancelReason (número y totales son inmutables). Emitir y anular son dos
+      // permisos distintos: un vendedor factura, pero anular puede quedar
+      // reservado. Admin tiene bypass total para soporte (incluido delete).
       match /invoices/{invoiceId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'sales.view');
+        allow create: if can(businessId, 'invoices.create')
                          && request.resource.data.userId == request.auth.uid
                          && request.resource.data.size() < 40;
-        allow update: if (isOwner(businessOwner(businessId))
+        allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 40
                            // Inmutables: número, totales, items, fecha de emisión
                            && request.resource.data.number == resource.data.number
@@ -222,14 +335,14 @@ service cloud.firestore {
       }
 
       // ---- remitos (comprobantes de entrega de mercadería) ----
-      // Mismo criterio que invoices: casi inmutables para el owner (se permite
-      // anular, no reescribir número ni cantidades). Admin tiene bypass total.
+      // Mismo criterio que invoices: casi inmutables (se permite anular, no
+      // reescribir número ni cantidades). Admin tiene bypass total.
       match /remitos/{remitoId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'sales.view');
+        allow create: if can(businessId, 'remitos.create')
                          && request.resource.data.userId == request.auth.uid
                          && request.resource.data.size() < 40;
-        allow update: if (isOwner(businessOwner(businessId))
+        allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 40
                            // Inmutables: número, cantidades y valorización
                            && request.resource.data.number == resource.data.number
@@ -245,11 +358,11 @@ service cloud.firestore {
       // anular, no reescribir número ni importe — el saldo del cliente se
       // calcula desde estos docs y no puede reescribirse la historia).
       match /receipts/{receiptId} {
-        allow read:   if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:   if can(businessId, 'accounts.view');
+        allow create: if can(businessId, 'receipts.create')
                          && request.resource.data.userId == request.auth.uid
                          && request.resource.data.size() < 30;
-        allow update: if (isOwner(businessOwner(businessId))
+        allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 30
                            // Inmutables: número, cliente e importe
                            && request.resource.data.number == resource.data.number
@@ -261,9 +374,12 @@ service cloud.firestore {
       }
 
       // ---- counters (numeración de comprobantes) ----
+      // La numeración es transversal: la toca cualquiera que pueda emitir algo.
       match /counters/{counterId} {
-        allow read:           if isOwner(businessOwner(businessId)) || isAdmin();
-        allow create, update: if (isOwner(businessOwner(businessId)) || isAdmin())
+        allow read:           if belongsToBusiness(businessId);
+        allow create, update: if (can(businessId, 'invoices.create')
+                                  || can(businessId, 'remitos.create')
+                                  || can(businessId, 'receipts.create'))
                                   && request.resource.data.size() < 10;
         allow delete:         if isAdmin();
       }
@@ -275,6 +391,14 @@ service cloud.firestore {
       match /secrets/{secretId} {
         allow read, write: if false;
       }
+    }
+
+    // ---- members (collection group) ----
+    // Un empleado no puede listar `businesses` (no es dueño de ninguno): la
+    // única forma de descubrir a qué comercios entra es esta query por su uid.
+    // Solo devuelve sus propias membresías, nunca las de otros.
+    match /{path=**}/members/{memberId} {
+      allow read, list: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // ============================================================

@@ -38,23 +38,50 @@ async function writeSecret(businessId, patch) {
   }, { merge: true });
 }
 
-async function assertBusinessOwner(businessId, uid) {
-  const snap = await getFirestore().doc(`businesses/${businessId}`).get();
+/**
+ * Quién puede tocar esto: el dueño siempre, y un empleado activo si su doc de
+ * miembro le da el permiso pedido (o si tiene rol admin en el comercio).
+ *
+ * Existe porque las callables de ARCA son la única vía a la facturación
+ * electrónica: si acá solo entrara el dueño, un empleado con `invoices.create`
+ * podría cargar la factura pero nunca pedirle el CAE a ARCA, y la promesa del
+ * permiso quedaría a medias.
+ *
+ * @param {string} businessId
+ * @param {string} uid
+ * @param {string|string[]|null} permission  Permiso(s) que habilitan; con una
+ *   lista alcanza con tener uno. null = solo el dueño.
+ */
+async function assertBusinessAccess(businessId, uid, permission) {
+  const db = getFirestore();
+  const snap = await db.doc(`businesses/${businessId}`).get();
   if (!snap.exists) {
     const err = new Error('Comercio no encontrado');
     err.code = 'not-found';
     throw err;
   }
-  if (snap.data().ownerId !== uid) {
-    const err = new Error('Sin permisos sobre este comercio');
-    err.code = 'permission-denied';
-    throw err;
+
+  const business = snap.data();
+  if (business.ownerId === uid) return business;
+
+  const required = Array.isArray(permission) ? permission : (permission ? [permission] : []);
+  if (required.length > 0) {
+    const member = await db.doc(`businesses/${businessId}/members/${uid}`).get();
+    const data = member.exists ? member.data() : null;
+    const permissions = (data && data.permissions) || {};
+    const allowed = !!data
+      && data.active !== false
+      && (data.role === 'admin' || required.some(key => permissions[key] === true));
+    if (allowed) return business;
   }
-  return snap.data();
+
+  const err = new Error('Sin permisos sobre este comercio');
+  err.code = 'permission-denied';
+  throw err;
 }
 
 module.exports = {
   readSecret,
   writeSecret,
-  assertBusinessOwner,
+  assertBusinessAccess,
 };

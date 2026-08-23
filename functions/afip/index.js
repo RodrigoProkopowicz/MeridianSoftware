@@ -20,7 +20,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { dummy, getLastAuthorized, requestCAE } = require('./wsfe');
-const { readSecret, writeSecret, assertBusinessOwner } = require('./store');
+const { readSecret, writeSecret, assertBusinessAccess } = require('./store');
 const { CBTE_TIPO } = require('./config');
 const { buildVoucherRequest, formatVoucherNumber, parseAfipDate } = require('./voucher');
 
@@ -47,7 +47,7 @@ exports.saveAfipConfig = onCall(async (req) => {
     throw new HttpsError('invalid-argument', 'taxCondition debe ser RI|MT');
   }
 
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'business.manage');
 
   await writeSecret(businessId, {
     env: 'production',
@@ -97,7 +97,7 @@ exports.setupAfipExpress = onCall({ secrets: [AFIPSDK_SECRET], timeoutSeconds: 5
     throw new HttpsError('invalid-argument', 'taxCondition debe ser RI|MT');
   }
 
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'business.manage');
 
   const Afip = require('@afipsdk/afip.js');
   const afip = new Afip({ access_token: process.env.AFIPSDK_ACCESS_TOKEN });
@@ -191,7 +191,7 @@ exports.clearAfipConfig = onCall(async (req) => {
   requireAuth(req);
   const { businessId } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'business.manage');
 
   await getFirestore().doc(`businesses/${businessId}/secrets/afip`).delete();
   return { ok: true };
@@ -204,7 +204,7 @@ exports.getAfipStatus = onCall(async (req) => {
   requireAuth(req);
   const { businessId } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, ['sales.view', 'business.manage']);
 
   const secret = await readSecret(businessId);
   if (!secret) return { configured: false };
@@ -226,7 +226,7 @@ exports.testAfipConnection = onCall({ secrets: [AFIPSDK_SECRET] }, async (req) =
   requireAuth(req);
   const { businessId } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'business.manage');
 
   const secret = await readSecret(businessId);
   if (!secret) throw new HttpsError('failed-precondition', 'AFIP no configurado');
@@ -259,7 +259,7 @@ exports.getAfipLastNumber = onCall({ secrets: [AFIPSDK_SECRET] }, async (req) =>
   const { businessId, cbteTipo } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
   if (!cbteTipo)   throw new HttpsError('invalid-argument', 'cbteTipo requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'invoices.create');
 
   const secret = await readSecret(businessId);
   if (!secret) throw new HttpsError('failed-precondition', 'AFIP no configurado');
@@ -280,7 +280,7 @@ exports.lookupCuitPadron = onCall({ secrets: [AFIPSDK_SECRET] }, async (req) => 
   requireAuth(req);
   const { businessId, cuit } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, ['clients.manage', 'invoices.create', 'business.manage']);
 
   const cuitClean = String(cuit || '').replace(/[^0-9]/g, '');
   if (cuitClean.length !== 11) {
@@ -369,7 +369,7 @@ exports.requestAfipCAE = onCall({ secrets: [AFIPSDK_SECRET], timeoutSeconds: 120
   const { businessId, invoiceId } = req.data || {};
   if (!businessId) throw new HttpsError('invalid-argument', 'businessId requerido');
   if (!invoiceId)  throw new HttpsError('invalid-argument', 'invoiceId requerido');
-  await assertOwnerOrThrow(businessId, req.auth.uid);
+  await assertAccessOrThrow(businessId, req.auth.uid, 'invoices.create');
 
   const secret = await readSecret(businessId);
   if (!secret?.cuit || !secret?.pointOfSale) {
@@ -422,9 +422,17 @@ function requireAuth(req) {
   if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Sesión requerida');
 }
 
-async function assertOwnerOrThrow(businessId, uid) {
+/**
+ * Chequea el acceso al comercio pidiendo permisos del equipo. El dueño pasa
+ * siempre; un empleado, solo si su rol se lo habilita. Con una lista de
+ * permisos alcanza con tener uno — hay callables a las que se llega desde
+ * pantallas distintas (el padrón se consulta desde clientes, desde la factura
+ * y desde la configuración del emisor).
+ * Ver functions/stock/members.js para el modelo de permisos.
+ */
+async function assertAccessOrThrow(businessId, uid, permission) {
   try {
-    await assertBusinessOwner(businessId, uid);
+    await assertBusinessAccess(businessId, uid, permission);
   } catch (err) {
     const code = err.code === 'permission-denied' ? 'permission-denied' : 'not-found';
     throw new HttpsError(code, err.message);

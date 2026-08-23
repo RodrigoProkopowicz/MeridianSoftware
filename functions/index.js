@@ -137,6 +137,16 @@ exports.cancelPromotionalSubscription = promotional.cancelPromotionalSubscriptio
 exports.updatePromotionalAmount       = promotional.updatePromotionalAmount;
 exports.listMyProducts                = promotional.listMyProducts;
 
+// ============================================================
+// Stock Manager — equipo de cada comercio
+// Módulo autocontenido en functions/stock/.
+// ============================================================
+const stockMembers = require('./stock/members');
+exports.createBusinessMember      = stockMembers.createBusinessMember;
+exports.setBusinessMemberPassword = stockMembers.setBusinessMemberPassword;
+exports.deleteBusinessMember      = stockMembers.deleteBusinessMember;
+exports.syncStockMemberAccess     = stockMembers.syncStockMemberAccess;
+
 /**
  * setAdminClaim — callable that grants or revokes the `admin` custom claim
  * on a target user. Only existing admins may call it.
@@ -256,6 +266,10 @@ exports.createUser = onCall({ enforceAppCheck: true }, async (request) => {
     photoURL: '',
     provider: 'password',
     admin,
+    // Las cuentas que nacen en el panel son dueñas: administran los comercios
+    // que den de alta y pueden crear empleados. Las de empleado las crea la
+    // callable createBusinessMember con accountType: 'employee'.
+    accountType: 'owner',
     createdAt: FieldValue.serverTimestamp(),
     lastLoginAt: FieldValue.serverTimestamp(),
   });
