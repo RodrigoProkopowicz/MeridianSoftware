@@ -92,7 +92,7 @@ No hay `.github/workflows`, ni eslint, ni prettier. Deploys 100% manuales desde 
 - **B4 — Async sin guard**: `signOut()` (`AuthenticationService.js:73`) es un `await` pelado invocado como fire-and-forget en ~6 click handlers sin `.catch` → unhandled rejection si falla. `DeviceScene.js` tiene un `await` sin try/catch en el render path.
 - **B5 — Capa de servicios sin convención de errores**: unos tiran (`AdminService`, `AccountService`, `FirestoreService`, `DemoAccessService` — 0 try/catch, dependen del caller), otros tragan (`AnalyticsService`, `RecaptchaService`, `createOrUpdateUserProfile`). Funciona, pero el contrato no es uniforme.
 - **B6 — Cruft**: worktree stale `.claude/worktrees/nostalgic-varahamihira-9fc505/` (2.8M, copia vieja del árbol).
-- **B7 — `firestore.indexes.json` ausente**: los índices compuestos no están versionados (hoy solo se usan queries de campo único, así que el impacto es nulo, pero es drift potencial).
+- **B7 — `firestore.indexes.json`**: resuelto. Existe y está declarado en `firebase.json`. Hoy solo tiene el override de `members.uid` con scope COLLECTION_GROUP, que es lo que necesita la query con la que cada empleado de Stock Manager descubre a qué comercios entra (los índices de campo único que crea Firestore solo tienen scope COLLECTION y no la cubren).
 - **B8 — XSS defense-in-depth (no explotable)**: atributos `class="admin-pill--${x}"` sin comillas en `LeadsTab.js:117,120` y `PromotionalTab.js:162-163`; los valores hoy son escapados o vienen de whitelists, pero el patrón es frágil (`escapeHtml` no escapa espacios).
 
 ---
