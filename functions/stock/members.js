@@ -35,6 +35,7 @@ const PRODUCT_ID = 'stock-manager';
  */
 const PERMISSION_KEYS = [
   'stock.view', 'stock.manage', 'stock.delete', 'movements.create',
+  'stockcount.perform', 'stockcount.manage',
   'suppliers.view', 'suppliers.manage', 'costs.view',
   'sales.view', 'invoices.create', 'invoices.cancel', 'remitos.create',
   'clients.view', 'clients.manage', 'accounts.view', 'receipts.create',
@@ -50,6 +51,8 @@ const PERMISSION_REQUIRES = {
   'stock.manage':     ['stock.view'],
   'stock.delete':     ['stock.view', 'stock.manage'],
   'movements.create': ['stock.view'],
+  'stockcount.perform': ['stock.view'],
+  'stockcount.manage':  ['stock.view', 'stockcount.perform'],
   'suppliers.manage': ['suppliers.view'],
   'invoices.create':  ['sales.view', 'clients.view'],
   'invoices.cancel':  ['sales.view'],

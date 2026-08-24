@@ -326,6 +326,90 @@ describe('businesses/{id}/remitos — Stock Manager', () => {
 });
 
 // ============================================================
+describe('businesses/{id}/stockCounts — Stock Manager', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const count = (over = {}) => ({
+    title: 'Control del depósito',
+    status: 'pending',
+    assignedTo: 'maria',
+    assignedToName: 'María',
+    blind: true,
+    scope: 'general',
+    items: [{ productId: 'p1', name: 'Coca', expected: 10, counted: null }],
+    createdBy: 'alice',
+    ...over,
+  });
+
+  const member = (permissions) => ({
+    uid: 'maria', businessId: 'b1', email: 'maria@x.com', displayName: 'María',
+    role: 'custom', active: true, permissions,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      // María cuenta pero no asigna; Pedro no tiene nada de controles.
+      await setDoc(doc(db, 'businesses/b1/members/maria'), member({
+        'stock.view': true, 'stockcount.perform': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/pedro'), {
+        ...member({ 'stock.view': true }), uid: 'pedro', displayName: 'Pedro',
+      });
+    });
+  });
+
+  test('el dueño asigna un control; quien solo cuenta, no', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1'), count()));
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c2'), count()));
+    await assertFails(setDoc(doc(anon(), 'businesses/b1/stockCounts/c3'), count()));
+  });
+
+  test('un control necesita título y responsable', async () => {
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1'), count({ title: '' })));
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1'), count({ assignedTo: '' })));
+  });
+
+  test('lo lee quien puede contar; quien no tiene el permiso, no', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count()));
+    await assertSucceeds(getDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1')));
+    await assertSucceeds(getDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1')));
+    await assertFails(getDoc(doc(employee('pedro'), 'businesses/b1/stockCounts/c1')));
+    await assertFails(getDoc(doc(other('mallory'), 'businesses/b1/stockCounts/c1')));
+  });
+
+  test('la planilla la completa quien la tiene asignada', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count()));
+    await assertSucceeds(updateDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1'), {
+      items: [{ productId: 'p1', name: 'Coca', expected: 10, counted: 8 }],
+      status: 'in_progress',
+    }));
+    await assertFails(updateDoc(doc(employee('pedro'), 'businesses/b1/stockCounts/c1'), { status: 'completed' }));
+  });
+
+  test('quien cuenta no se puede pasar la planilla a otro', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count()));
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1'), {
+      assignedTo: 'pedro',
+    }));
+  });
+
+  test('el control de otro no se toca', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count({ assignedTo: 'pedro' }));
+    });
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1'), { status: 'completed' }));
+    await assertSucceeds(updateDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1'), { status: 'completed' }));
+  });
+
+  test('borrar el control es de quien lo asigna', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count()));
+    await assertFails(deleteDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1')));
+    await assertSucceeds(deleteDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1')));
+  });
+});
+
+// ============================================================
 describe('clinics/{id}/patients — Medicus (HC)', () => {
   test('owner lee su paciente; otro no', async () => {
     await seed(async (db) => {

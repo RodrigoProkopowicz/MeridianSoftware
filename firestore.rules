@@ -305,6 +305,28 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
+      // ---- stockCounts (planillas de control de stock) ----
+      // El control lo arma quien administra los recuentos y lo completa quien
+      // lo tiene asignado, que es la única planilla que puede tocar. La hoja no
+      // guarda plata: son artículos, lo que el sistema dice tener y lo contado.
+      //
+      // Aplicar las diferencias no se escribe acá: son movimientos de ajuste,
+      // y los cubre `movesStock()` como cualquier otro movimiento a mano.
+      match /stockCounts/{countId} {
+        allow read:   if can(businessId, 'stockcount.perform');
+        allow create: if can(businessId, 'stockcount.manage')
+                         && isNonEmptyString(request.resource.data.title, 120)
+                         && isNonEmptyString(request.resource.data.assignedTo, 128)
+                         && request.resource.data.size() < 30;
+        // Quien cuenta no se puede reasignar la planilla ni pasársela a otro.
+        allow update: if (can(businessId, 'stockcount.manage')
+                          || (can(businessId, 'stockcount.perform')
+                              && resource.data.assignedTo == request.auth.uid
+                              && request.resource.data.assignedTo == resource.data.assignedTo))
+                         && request.resource.data.size() < 30;
+        allow delete: if can(businessId, 'stockcount.manage');
+      }
+
       // ---- suppliers ----
       match /suppliers/{supplierId} {
         allow read:   if can(businessId, 'suppliers.view');
