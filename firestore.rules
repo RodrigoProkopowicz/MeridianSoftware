@@ -338,6 +338,20 @@ service cloud.firestore {
         allow delete: if can(businessId, 'suppliers.manage');
       }
 
+      // ---- priceLists (listas por cliente: mayorista, distribuidor…) ----
+      // Las lee cualquiera que venda (el formulario aplica el ajuste al elegir
+      // el cliente) y las administra quien configura el comercio: cambiar una
+      // lista cambia lo que se le cobra a todo un grupo de clientes.
+      match /priceLists/{listId} {
+        allow read:   if can(businessId, 'sales.view') || can(businessId, 'stock.view');
+        allow create: if can(businessId, 'business.manage')
+                         && isNonEmptyString(request.resource.data.name, 80)
+                         && request.resource.data.size() < 15;
+        allow update: if can(businessId, 'business.manage')
+                         && request.resource.data.size() < 15;
+        allow delete: if can(businessId, 'business.manage');
+      }
+
       // ---- clients (destinatarios de facturas) ----
       match /clients/{clientId} {
         allow read:   if can(businessId, 'clients.view');
@@ -409,13 +423,35 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
 
+      // ---- creditNotes (devoluciones) ----
+      // Una nota de crédito es el "deshacer parcial" de una venta: devuelve
+      // parte de lo vendido, acredita en la cuenta del cliente y puede
+      // reingresar stock. Por eso la emite quien puede anular comprobantes, y
+      // el reingreso lo cubre `movesStock()` (que ya incluye `invoices.cancel`).
+      match /creditNotes/{noteId} {
+        allow read:   if can(businessId, 'sales.view');
+        allow create: if can(businessId, 'invoices.cancel')
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.sourceId is string
+                         && request.resource.data.size() < 30;
+        // Solo se anula: número, origen e importe son inmutables.
+        allow update: if (can(businessId, 'invoices.cancel')
+                           && request.resource.data.size() < 30
+                           && request.resource.data.number == resource.data.number
+                           && request.resource.data.sourceId == resource.data.sourceId
+                           && request.resource.data.total == resource.data.total)
+                        || isAdmin();
+        allow delete: if isAdmin();
+      }
+
       // ---- counters (numeración de comprobantes) ----
       // La numeración es transversal: la toca cualquiera que pueda emitir algo.
       match /counters/{counterId} {
         allow read:           if belongsToBusiness(businessId);
         allow create, update: if (can(businessId, 'invoices.create')
                                   || can(businessId, 'remitos.create')
-                                  || can(businessId, 'receipts.create'))
+                                  || can(businessId, 'receipts.create')
+                                  || can(businessId, 'invoices.cancel'))
                                   && request.resource.data.size() < 10;
         allow delete:         if isAdmin();
       }
