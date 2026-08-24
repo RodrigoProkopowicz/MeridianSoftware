@@ -278,6 +278,20 @@ service cloud.firestore {
         allow delete: if can(businessId, 'stock.delete');
       }
 
+      // ---- promotions (artículo compuesto: combo, oferta 3x) ----
+      // Se leen con `stock.view` porque el vendedor tiene que poder elegirlas
+      // al emitir, y se administran con `stock.manage` como cualquier artículo.
+      // No guardan stock: el disponible se calcula contra los products.
+      match /promotions/{promotionId} {
+        allow read:   if can(businessId, 'stock.view');
+        allow create: if can(businessId, 'stock.manage')
+                         && isNonEmptyString(request.resource.data.name, 200)
+                         && request.resource.data.size() < 20;
+        allow update: if can(businessId, 'stock.manage')
+                         && request.resource.data.size() < 20;
+        allow delete: if can(businessId, 'stock.manage');
+      }
+
       // ---- movements ----
       // Inmutables para el comercio (solo create + read). Admin tiene bypass
       // para soporte: puede update/delete movements de comercios ajenos.
