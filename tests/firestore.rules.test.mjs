@@ -326,6 +326,73 @@ describe('businesses/{id}/remitos — Stock Manager', () => {
 });
 
 // ============================================================
+describe('businesses/{id}/creditNotes y priceLists — Stock Manager', () => {
+  const nota = (over = {}) => ({
+    number: '0001-00000001',
+    numberInt: 1,
+    status: 'issued',
+    issuedAt: Timestamp.now(),
+    sourceKind: 'invoice',
+    sourceId: 'inv-1',
+    sourceNumber: '0001-00000009',
+    clientId: 'cli-1',
+    lineItems: [{ sourceIndex: 0, description: 'Café', quantity: 1, unitPrice: 1000, total: 1000 }],
+    total: 1000,
+    userId: 'alice',
+    ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+    });
+  });
+
+  test('el owner emite la devolución; otro usuario no', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1'), nota()));
+    await assertFails(setDoc(doc(other('mallory'), 'businesses/b1/creditNotes/n2'), nota({ userId: 'mallory' })));
+    await assertFails(setDoc(doc(anon(), 'businesses/b1/creditNotes/n3'), nota()));
+  });
+
+  test('la nota queda firmada por quien la emite', async () => {
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1'), nota({ userId: 'mallory' })));
+  });
+
+  test('anular sí, reescribir importe u origen no', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/creditNotes/n1'), nota()));
+
+    await assertSucceeds(updateDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1'), {
+      status: 'cancelled', cancelReason: 'Error de carga',
+    }));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1'), { total: 99999 }));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1'), { sourceId: 'otro' }));
+  });
+
+  test('el owner no borra devoluciones; el admin sí', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/creditNotes/n1'), nota()));
+    await assertFails(deleteDoc(doc(owner('alice'), 'businesses/b1/creditNotes/n1')));
+    await assertSucceeds(deleteDoc(doc(admin(), 'businesses/b1/creditNotes/n1')));
+  });
+
+  test('las listas de precios las administra el dueño y las lee su equipo', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/priceLists/l1'), {
+      name: 'Mayorista', adjustPercent: -15, active: true,
+    }));
+    await assertFails(setDoc(doc(other('mallory'), 'businesses/b1/priceLists/l2'), {
+      name: 'Trucha', adjustPercent: -90, active: true,
+    }));
+    await assertSucceeds(getDoc(doc(owner('alice'), 'businesses/b1/priceLists/l1')));
+    await assertFails(getDoc(doc(other('mallory'), 'businesses/b1/priceLists/l1')));
+  });
+
+  test('una lista sin nombre no se crea', async () => {
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/priceLists/l1'), {
+      name: '', adjustPercent: -15, active: true,
+    }));
+  });
+});
+
+// ============================================================
 describe('businesses/{id}/stockCounts — Stock Manager', () => {
   const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
 
