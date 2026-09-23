@@ -39,6 +39,7 @@ const PERMISSION_KEYS = [
   'suppliers.view', 'suppliers.manage', 'costs.view',
   'sales.view', 'invoices.create', 'invoices.cancel', 'remitos.create',
   'clients.view', 'clients.manage', 'accounts.view', 'receipts.create',
+  'profits.view',
   'insights.view', 'business.manage', 'team.manage',
 ];
 
@@ -60,6 +61,9 @@ const PERMISSION_REQUIRES = {
   'clients.manage':   ['clients.view'],
   'accounts.view':    ['clients.view'],
   'receipts.create':  ['clients.view', 'accounts.view'],
+  // La ganancia neta se calcula sobre los comprobantes: sin verlos no hay de
+  // dónde sacarla. No viene con ningún rol salvo admin.
+  'profits.view':     ['sales.view'],
 };
 
 const ROLES = ['admin', 'vendedor', 'deposito', 'consulta', 'custom'];
