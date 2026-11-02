@@ -22,7 +22,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { dummy, getLastAuthorized, requestCAE } = require('./wsfe');
 const { readSecret, writeSecret, assertBusinessAccess } = require('./store');
 const { CBTE_TIPO } = require('./config');
-const { buildVoucherRequest, formatVoucherNumber, parseAfipDate } = require('./voucher');
+const { buildVoucherRequest, formatVoucherNumber, parseAfipDate, isCaeLocked } = require('./voucher');
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
@@ -377,43 +377,72 @@ exports.requestAfipCAE = onCall({ secrets: [AFIPSDK_SECRET], timeoutSeconds: 120
   }
 
   const invRef = getFirestore().doc(`businesses/${businessId}/invoices/${invoiceId}`);
-  const invSnap = await invRef.get();
-  if (!invSnap.exists) throw new HttpsError('not-found', 'Factura no encontrada');
-  const inv = invSnap.data();
-  if (inv.cae)      throw new HttpsError('failed-precondition', 'La factura ya tiene CAE');
+  const inv = await claimCaeRequest(invRef);
 
-  // Toda la traducción factura → request WSFE es pura y está testeada en voucher.js
-  let voucherReq;
   try {
-    voucherReq = buildVoucherRequest(inv, secret);
+    // Toda la traducción factura → request WSFE es pura y está testeada en voucher.js
+    let voucherReq;
+    try {
+      voucherReq = buildVoucherRequest(inv, secret);
+    } catch (err) {
+      throw new HttpsError('failed-precondition', err.message);
+    }
+    const { cbte, condicionIVAReceptorId, cbteTipo } = voucherReq;
+
+    const { cae, caeFchVto, cbteNro, obs } = await requestCAE(businessId, cbte, condicionIVAReceptorId);
+
+    const newNumberStr = formatVoucherNumber(secret.pointOfSale, cbteNro);
+    await invRef.update({
+      cae,
+      caeExpiresAt: parseAfipDate(caeFchVto),
+      caeRequestedAt: FieldValue.delete(),
+      afipStatus: 'authorized',
+      cbteTipo,
+      number: newNumberStr,
+      numberInt: cbteNro,
+      afipObservations: obs.length ? obs : null,
+      condicionIVAReceptorId,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      cae,
+      caeExpiresAt: parseAfipDate(caeFchVto).toISOString(),
+      cbteNro,
+      number: newNumberStr,
+      observations: obs,
+    };
   } catch (err) {
-    throw new HttpsError('failed-precondition', err.message);
+    // Un rechazo de ARCA deja la factura lista para reintentar.
+    await invRef.update({ caeRequestedAt: FieldValue.delete() }).catch(releaseErr =>
+      console.warn('requestAfipCAE: no pudimos liberar el pedido', releaseErr.message));
+    throw err;
   }
-  const { cbte, condicionIVAReceptorId, cbteTipo } = voucherReq;
-
-  const { cae, caeFchVto, cbteNro, obs } = await requestCAE(businessId, cbte, condicionIVAReceptorId);
-
-  const newNumberStr = formatVoucherNumber(secret.pointOfSale, cbteNro);
-  await invRef.update({
-    cae,
-    caeExpiresAt: parseAfipDate(caeFchVto),
-    afipStatus: 'authorized',
-    cbteTipo,
-    number: newNumberStr,
-    numberInt: cbteNro,
-    afipObservations: obs.length ? obs : null,
-    condicionIVAReceptorId,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-
-  return {
-    cae,
-    caeExpiresAt: parseAfipDate(caeFchVto).toISOString(),
-    cbteNro,
-    number: newNumberStr,
-    observations: obs,
-  };
 });
+
+/**
+ * Reserva la factura antes de hablar con ARCA, en una transacción. Sin esto, dos
+ * pedidos cruzados (dos pestañas, dos dispositivos, dos personas) pasaban los dos
+ * por el `if (inv.cae)` y ARCA autorizaba dos comprobantes por la misma venta.
+ *
+ * Por qué `failed-precondition` y no esperar: el segundo pedido no tiene nada que
+ * hacer, el CAE ya viene en camino.
+ *
+ * @returns {Promise<object>} la factura reservada
+ */
+async function claimCaeRequest(invRef) {
+  return getFirestore().runTransaction(async (tx) => {
+    const snap = await tx.get(invRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Factura no encontrada');
+    const inv = snap.data();
+    if (inv.cae) throw new HttpsError('failed-precondition', 'La factura ya tiene CAE');
+    if (isCaeLocked(inv, Date.now())) {
+      throw new HttpsError('failed-precondition', 'Ya se está pidiendo el CAE de esta factura. Esperá un momento.');
+    }
+    tx.update(invRef, { caeRequestedAt: FieldValue.serverTimestamp() });
+    return inv;
+  });
+}
 
 // ============================================================
 // Helpers

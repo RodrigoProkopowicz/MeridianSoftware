@@ -181,6 +181,16 @@ service cloud.firestore {
       return isOwner(businessOwner(businessId)) || memberCan(businessId, permission) || isAdmin();
     }
 
+    // ¿Administra el comercio? Dueño, empleado activo con rol admin o super-admin.
+    // `memberCan` no sirve para esto: acepta un permiso suelto, y lo que se
+    // pregunta acá es justo lo que ningún tilde tiene que poder otorgar.
+    function isBusinessAdmin(businessId) {
+      return isOwner(businessOwner(businessId))
+             || (isActiveMember(businessId)
+                 && memberData(businessId).get('role', 'custom') == 'admin')
+             || isAdmin();
+    }
+
     // Quién puede mover la CANTIDAD de un producto (y solo la cantidad):
     //   - el depósito, cargando un movimiento a mano;
     //   - la venta, al emitir una factura o un remito — descuenta el stock y deja
@@ -238,33 +248,53 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.ownerId) || isAdmin();
 
       // ---- members (equipo del comercio) ----
-      // La cuenta la crea la callable `createBusinessMember` (Admin SDK, se
-      // saltea estas reglas). Desde el cliente solo se editan rol y permisos.
+      // La cuenta la crea la callable `createBusinessMember` y `assignBusinessMember`
+      // la suma a otro comercio del mismo dueño (Admin SDK, se saltean estas
+      // reglas). Desde el cliente solo se editan rol y permisos.
       match /members/{memberId} {
         // Cada quien lee su propia membresía (así la app sabe qué puede hacer);
-        // el dueño y quien administra el equipo leen todo el listado.
+        // el dueño y quien administra el equipo leen todo el listado, y quien
+        // asigna controles de stock también: elegir quién cuenta es su permiso.
         allow read, list: if isSignedIn()
                              && (memberId == request.auth.uid
                                  || isOwner(businessOwner(businessId))
                                  || memberCan(businessId, 'team.manage')
+                                 || memberCan(businessId, 'stockcount.manage')
                                  || isAdmin());
         // El único create desde el cliente es el del propio dueño al crear el
         // comercio (queda listado en Equipo). Los empleados los crea la callable.
         allow create: if (isOwner(businessOwner(businessId)) && memberId == request.auth.uid)
                          || isAdmin();
         // Nadie edita su propia membresía: si no, quien administra el equipo se
-        // ascendería a admin de un tilde. El uid tampoco se puede reapuntar.
+        // ascendería a admin de un tilde. El uid tampoco se puede reapuntar, ni
+        // el comercio: la app arma la lista de comercios desde ese campo, y un
+        // doc que apunte a otro lado deja al empleado sin poder entrar a ninguno.
+        //
+        // A un admin lo toca solo otro admin. `team.manage` es un tilde y el rol
+        // admin es lo que ningún tilde otorga: da el registro y saca de él. Por
+        // eso la condición mira los dos lados: si solo mirara lo que queda
+        // escrito, ese tilde podría desactivar o reactivar a un admin.
         allow update: if ((isOwner(businessOwner(businessId))
                             || (memberCan(businessId, 'team.manage') && memberId != request.auth.uid))
                            && request.resource.data.uid == resource.data.uid
-                           && request.resource.data.size() < 15)
+                           && request.resource.data.get('businessId', businessId) == businessId
+                           && request.resource.data.size() < 15
+                           && ((request.resource.data.get('role', 'custom') != 'admin'
+                                && resource.data.get('role', 'custom') != 'admin')
+                               || isBusinessAdmin(businessId)))
                         || isAdmin();
         allow delete: if isOwner(businessOwner(businessId)) || isAdmin();
       }
 
       // ---- products ----
       match /products/{productId} {
-        allow read:   if can(businessId, 'stock.view');
+        // El catálogo es de `stock.view`. Pero anular, devolver o facturar leen
+        // cada producto por id dentro de la transacción, y una sola lectura
+        // denegada tumba todo: quien mueve stock necesita esa lectura aunque no
+        // vea el catálogo. Por eso van separados: `get` abre el doc que ya se
+        // conoce y `list` sigue cerrado.
+        allow get:    if can(businessId, 'stock.view') || movesStock(businessId);
+        allow list:   if can(businessId, 'stock.view');
         allow create: if can(businessId, 'stock.manage')
                          && isNonEmptyString(request.resource.data.name, 200)
                          && request.resource.data.size() < 30;
@@ -325,6 +355,30 @@ service cloud.firestore {
                               && request.resource.data.assignedTo == resource.data.assignedTo))
                          && request.resource.data.size() < 30;
         allow delete: if can(businessId, 'stockcount.manage');
+      }
+
+      // ---- tasks (tareas que se le asignan a un empleado) ----
+      // Cuelgan del comercio: la misma persona tiene tareas independientes en
+      // cada local. Las reparte quien administra el equipo. El asignado no
+      // necesita ningún permiso tildado, pero solo ve las suyas y lo único que
+      // puede hacer es marcarlas: no se las reescribe ni se las pasa a otro.
+      match /tasks/{taskId} {
+        // La condición compara `assignedTo`, así que la query del empleado tiene
+        // que filtrar por su uid: es lo que le impide listar las de los demás.
+        allow read:   if can(businessId, 'team.manage')
+                         || (isActiveMember(businessId)
+                             && resource.data.assignedTo == request.auth.uid);
+        allow create: if can(businessId, 'team.manage')
+                         && isNonEmptyString(request.resource.data.title, 200)
+                         && isNonEmptyString(request.resource.data.assignedTo, 128)
+                         && request.resource.data.size() < 20;
+        allow update: if (can(businessId, 'team.manage')
+                           && request.resource.data.size() < 20)
+                        || (isActiveMember(businessId)
+                            && resource.data.assignedTo == request.auth.uid
+                            && request.resource.data.diff(resource.data)
+                                 .affectedKeys().hasOnly(['status', 'completedAt', 'completedBy', 'updatedAt']));
+        allow delete: if can(businessId, 'team.manage');
       }
 
       // ---- suppliers ----
@@ -399,6 +453,13 @@ service cloud.firestore {
                            && request.resource.data.numberInt == resource.data.numberInt
                            && request.resource.data.totalQuantity == resource.data.totalQuantity
                            && request.resource.data.subtotal == resource.data.subtotal)
+                        // Marcarlo como facturado va en la transacción de emitir
+                        // la factura: si exigiera `invoices.cancel`, un vendedor
+                        // sin ese permiso no podría facturar un remito.
+                        || (can(businessId, 'invoices.create')
+                            && resource.data.get('invoiceId', null) == null
+                            && request.resource.data.diff(resource.data)
+                                 .affectedKeys().hasOnly(['invoiceId', 'updatedAt']))
                         || isAdmin();
         allow delete: if isAdmin();
       }
@@ -454,6 +515,24 @@ service cloud.firestore {
                                   || can(businessId, 'invoices.cancel'))
                                   && request.resource.data.size() < 10;
         allow delete:         if isAdmin();
+      }
+
+      // ---- activity (registro de lo que hacen los trabajadores) ----
+      // Contesta "¿quién hizo esto?": por eso lo lee solo quien administra el
+      // comercio y nadie lo reescribe, ni el dueño ni el super-admin.
+      //
+      // Crear no exige un permiso por acción: la entrada va en la misma
+      // transacción que lo que registra, y una sola operación denegada tumbaría
+      // la venta entera. `actorId` y `createdAt` no se pueden falsear: la firma
+      // es de quien escribe y la hora, la del servidor.
+      match /activity/{entryId} {
+        allow read:   if isBusinessAdmin(businessId);
+        allow create: if belongsToBusiness(businessId)
+                         && request.resource.data.actorId == request.auth.uid
+                         && request.resource.data.createdAt == request.time
+                         && request.resource.data.keys().hasOnly(['action', 'actorId', 'actorName', 'actorRole', 'targetId', 'targetLabel', 'detail', 'createdAt'])
+                         && isNonEmptyString(request.resource.data.action, 40);
+        allow update, delete: if false;
       }
 
       // ---- secrets (AFIP cert/key/tokens) ----

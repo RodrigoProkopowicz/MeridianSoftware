@@ -22,7 +22,8 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, Timestamp, setLogLevel,
+  collection, getDocs, query, where, writeBatch, runTransaction,
+  Timestamp, serverTimestamp, setLogLevel,
 } from 'firebase/firestore';
 
 setLogLevel('error'); // silenciar el ruido de "permission denied" esperado
@@ -473,6 +474,480 @@ describe('businesses/{id}/stockCounts — Stock Manager', () => {
     await seed(async (db) => setDoc(doc(db, 'businesses/b1/stockCounts/c1'), count()));
     await assertFails(deleteDoc(doc(employee('maria'), 'businesses/b1/stockCounts/c1')));
     await assertSucceeds(deleteDoc(doc(owner('alice'), 'businesses/b1/stockCounts/c1')));
+  });
+});
+
+// ============================================================
+describe('businesses/{id}/activity — registro de Stock Manager', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const entry = (over = {}) => ({
+    action: 'invoice.create',
+    actorId: 'maria',
+    actorName: 'María',
+    actorRole: 'vendedor',
+    targetId: 'inv-1',
+    targetLabel: 'Factura 0001-00000001',
+    detail: '',
+    createdAt: serverTimestamp(),
+    ...over,
+  });
+
+  const member = (uid, over = {}) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions: {}, ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      // María no tiene ningún permiso: registrar no depende de eso.
+      await setDoc(doc(db, 'businesses/b1/members/maria'), member('maria'));
+      await setDoc(doc(db, 'businesses/b1/members/encargado'), member('encargado', {
+        permissions: { 'team.manage': true, 'business.manage': true, 'sales.view': true },
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/gerente'), member('gerente', { role: 'admin' }));
+      await setDoc(doc(db, 'businesses/b1/members/exadmin'), member('exadmin', { role: 'admin', active: false }));
+      await setDoc(doc(db, 'businesses/b1/members/baja'), member('baja', { active: false }));
+    });
+  });
+
+  test('el empleado registra con su uid, aunque no tenga permisos', async () => {
+    await assertSucceeds(setDoc(doc(employee('maria'), 'businesses/b1/activity/a1'), entry()));
+  });
+
+  test('la entrada va en el mismo commit que la acción', async () => {
+    const db = employee('encargado');
+
+    const firmada = writeBatch(db);
+    firmada.update(doc(db, 'businesses/b1'), { name: 'Tienda nueva' });
+    firmada.set(doc(db, 'businesses/b1/activity/a1'), entry({ actorId: 'encargado' }));
+    await assertSucceeds(firmada.commit());
+
+    // Una entrada denegada tumba la acción: no hay una sin la otra.
+    const falsa = writeBatch(db);
+    falsa.update(doc(db, 'businesses/b1'), { name: 'Tienda trucha' });
+    falsa.set(doc(db, 'businesses/b1/activity/a2'), entry({ actorId: 'maria' }));
+    await assertFails(falsa.commit());
+  });
+
+  test('nadie firma por otro', async () => {
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a1'), entry({ actorId: 'pedro' })));
+  });
+
+  test('createdAt es la hora del servidor, no una que mande el cliente', async () => {
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a1'), entry({
+      createdAt: Timestamp.fromMillis(Date.now() - DAY),
+    })));
+  });
+
+  test('no entran campos fuera de la lista', async () => {
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a1'), entry({ reviewed: true })));
+  });
+
+  test('la acción es un texto no vacío de hasta 40 caracteres', async () => {
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a1'), entry({ action: '' })));
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a2'), entry({ action: 7 })));
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/activity/a3'), entry({ action: 'x'.repeat(41) })));
+    await assertSucceeds(setDoc(doc(employee('maria'), 'businesses/b1/activity/a4'), entry({ action: 'x'.repeat(40) })));
+  });
+
+  test('quien no trabaja en el comercio no escribe', async () => {
+    await assertFails(setDoc(doc(employee('baja'), 'businesses/b1/activity/a1'), entry({ actorId: 'baja' })));
+    await assertFails(setDoc(doc(other('mallory'), 'businesses/b1/activity/a2'), entry({ actorId: 'mallory' })));
+    await assertFails(setDoc(doc(anon(), 'businesses/b1/activity/a3'), entry()));
+  });
+
+  test('un empleado no lee el registro, ni con todos los permisos tildados', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/activity/a1'), entry({ createdAt: Timestamp.now() })));
+    await assertFails(getDoc(doc(employee('maria'), 'businesses/b1/activity/a1')));
+    await assertFails(getDocs(collection(employee('maria'), 'businesses/b1/activity')));
+    await assertFails(getDoc(doc(employee('encargado'), 'businesses/b1/activity/a1')));
+    await assertFails(getDocs(collection(employee('encargado'), 'businesses/b1/activity')));
+    await assertFails(getDoc(doc(other('mallory'), 'businesses/b1/activity/a1')));
+  });
+
+  test('lo leen el dueño, el rol admin activo y el super-admin', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/activity/a1'), entry({ createdAt: Timestamp.now() })));
+    await assertSucceeds(getDocs(collection(owner('alice'), 'businesses/b1/activity')));
+    await assertSucceeds(getDocs(collection(employee('gerente'), 'businesses/b1/activity')));
+    await assertSucceeds(getDocs(collection(admin(), 'businesses/b1/activity')));
+    await assertFails(getDocs(collection(employee('exadmin'), 'businesses/b1/activity')));
+  });
+
+  test('nadie edita ni borra una entrada', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/activity/a1'), entry({ createdAt: Timestamp.now() })));
+    for (const db of [employee('maria'), owner('alice'), employee('gerente'), admin()]) {
+      await assertFails(updateDoc(doc(db, 'businesses/b1/activity/a1'), { detail: 'corregido' }));
+      await assertFails(deleteDoc(doc(db, 'businesses/b1/activity/a1')));
+    }
+  });
+});
+
+// ============================================================
+describe('businesses/{id}/tasks — Stock Manager', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const task = (over = {}) => ({
+    title: 'Ordenar el depósito',
+    assignedTo: 'maria',
+    assignedToName: 'María',
+    status: 'pending',
+    createdBy: 'alice',
+    ...over,
+  });
+
+  const member = (uid, over = {}) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions: {}, ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      await setDoc(doc(db, 'businesses/b2'), { ownerId: 'alice', name: 'Sucursal', currency: 'ARS' });
+      // María y Pedro no tienen ningún permiso: ver lo suyo no depende de eso.
+      await setDoc(doc(db, 'businesses/b1/members/maria'), member('maria'));
+      await setDoc(doc(db, 'businesses/b1/members/pedro'), member('pedro'));
+      await setDoc(doc(db, 'businesses/b1/members/encargado'), member('encargado', {
+        permissions: { 'team.manage': true },
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/baja'), member('baja', { active: false }));
+    });
+  });
+
+  test('asigna quien administra el equipo; un empleado común, no', async () => {
+    await assertSucceeds(setDoc(doc(owner('alice'), 'businesses/b1/tasks/t1'), task()));
+    await assertSucceeds(setDoc(doc(employee('encargado'), 'businesses/b1/tasks/t2'), task()));
+    await assertFails(setDoc(doc(employee('maria'), 'businesses/b1/tasks/t3'), task()));
+    await assertFails(setDoc(doc(anon(), 'businesses/b1/tasks/t4'), task()));
+  });
+
+  test('una tarea necesita título y responsable', async () => {
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/tasks/t1'), task({ title: '' })));
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/tasks/t2'), task({ assignedTo: '' })));
+  });
+
+  test('una tarea no puede tener 20 campos o más', async () => {
+    const relleno = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`campo${i}`, i]));
+    await assertFails(setDoc(doc(owner('alice'), 'businesses/b1/tasks/t1'), task(relleno)));
+  });
+
+  test('la lee el asignado y quien administra el equipo; otro empleado, no', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task()));
+    await assertSucceeds(getDoc(doc(employee('maria'), 'businesses/b1/tasks/t1')));
+    await assertSucceeds(getDoc(doc(owner('alice'), 'businesses/b1/tasks/t1')));
+    await assertSucceeds(getDoc(doc(employee('encargado'), 'businesses/b1/tasks/t1')));
+    await assertFails(getDoc(doc(employee('pedro'), 'businesses/b1/tasks/t1')));
+    await assertFails(getDoc(doc(other('mallory'), 'businesses/b1/tasks/t1')));
+  });
+
+  test('el empleado lista solo con su propio uid', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1/tasks/t1'), task());
+      await setDoc(doc(db, 'businesses/b1/tasks/t2'), task({ assignedTo: 'pedro' }));
+    });
+    const db = employee('maria');
+    const tasks = collection(db, 'businesses/b1/tasks');
+    await assertSucceeds(getDocs(query(tasks, where('assignedTo', '==', 'maria'))));
+    await assertFails(getDocs(query(tasks, where('assignedTo', '==', 'pedro'))));
+    await assertFails(getDocs(tasks));
+    await assertSucceeds(getDocs(collection(owner('alice'), 'businesses/b1/tasks')));
+  });
+
+  test('las tareas de un comercio no se ven desde otro donde no trabaja', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b2/tasks/t1'), task()));
+    await assertFails(getDoc(doc(employee('maria'), 'businesses/b2/tasks/t1')));
+  });
+
+  test('el desactivado pierde sus tareas', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task({ assignedTo: 'baja' })));
+    await assertFails(getDoc(doc(employee('baja'), 'businesses/b1/tasks/t1')));
+    await assertFails(updateDoc(doc(employee('baja'), 'businesses/b1/tasks/t1'), { status: 'done' }));
+  });
+
+  test('el asignado la marca como hecha y la reabre', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task()));
+    await assertSucceeds(updateDoc(doc(employee('maria'), 'businesses/b1/tasks/t1'), {
+      status: 'done',
+      completedAt: serverTimestamp(),
+      completedBy: 'maria',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(employee('maria'), 'businesses/b1/tasks/t1'), {
+      status: 'pending',
+      completedAt: null,
+      completedBy: '',
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('el asignado no la reescribe ni se la pasa a otro', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task()));
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/tasks/t1'), { title: 'Otra cosa' }));
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/tasks/t1'), { assignedTo: 'pedro' }));
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/tasks/t1'), {
+      status: 'done', title: 'Otra cosa',
+    }));
+  });
+
+  test('la tarea de otro no se toca', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task()));
+    await assertFails(updateDoc(doc(employee('pedro'), 'businesses/b1/tasks/t1'), { status: 'done' }));
+  });
+
+  test('quien administra el equipo la edita y la borra; el asignado no la borra', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/tasks/t1'), task()));
+    await assertSucceeds(updateDoc(doc(employee('encargado'), 'businesses/b1/tasks/t1'), {
+      title: 'Ordenar el depósito grande', assignedTo: 'pedro',
+    }));
+    await assertFails(deleteDoc(doc(employee('maria'), 'businesses/b1/tasks/t1')));
+    await assertSucceeds(deleteDoc(doc(employee('encargado'), 'businesses/b1/tasks/t1')));
+  });
+});
+
+// ============================================================
+describe('businesses/{id}/remitos — marcar como facturado', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const remito = () => ({
+    number: '0001-00000001',
+    numberInt: 1,
+    status: 'issued',
+    totalQuantity: 3,
+    subtotal: 0,
+    userId: 'alice',
+    invoiceId: null,
+  });
+
+  const member = (uid, permissions) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      await setDoc(doc(db, 'businesses/b1/remitos/r1'), remito());
+      await setDoc(doc(db, 'businesses/b1/members/vendedor'), member('vendedor', {
+        'sales.view': true, 'clients.view': true, 'invoices.create': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/mirador'), member('mirador', { 'sales.view': true }));
+    });
+  });
+
+  test('un vendedor sin invoices.cancel lo marca con la factura', async () => {
+    await assertSucceeds(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r1'), {
+      invoiceId: 'inv-1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('ese vendedor no puede tocar nada más del remito', async () => {
+    await assertFails(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r1'), {
+      status: 'cancelled', cancelReason: 'Error',
+    }));
+    await assertFails(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r1'), {
+      invoiceId: 'inv-1', status: 'cancelled',
+    }));
+  });
+
+  test('sin invoices.create no se marca', async () => {
+    await assertFails(updateDoc(doc(employee('mirador'), 'businesses/b1/remitos/r1'), {
+      invoiceId: 'inv-1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('un remito ya facturado no se vuelve a marcar ni se desmarca', async () => {
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/remitos/r2'), { ...remito(), invoiceId: 'inv-1' }));
+    await assertFails(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r2'), {
+      invoiceId: 'inv-2', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r2'), {
+      invoiceId: null, updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('un remito viejo, sin el campo, se marca igual', async () => {
+    const viejo = remito();
+    delete viejo.invoiceId;
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/remitos/r3'), viejo));
+    await assertSucceeds(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r3'), {
+      invoiceId: 'inv-1', updatedAt: serverTimestamp(),
+    }));
+  });
+});
+
+// ============================================================
+describe('businesses/{id}/products — por id y como catálogo', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const member = (uid, permissions, over = {}) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions, ...over,
+  });
+
+  const producto = 'businesses/b1/products/p1';
+  const catalogo = 'businesses/b1/products';
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      await setDoc(doc(db, producto), { name: 'Coca', quantity: 10, salePrice: 200 });
+      // Perfiles personalizados sin `stock.view`: el catálogo de permisos no lo
+      // exige para vender ni para anular.
+      await setDoc(doc(db, 'businesses/b1/members/anulador'), member('anulador', {
+        'sales.view': true, 'invoices.cancel': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/vendedor'), member('vendedor', {
+        'sales.view': true, 'clients.view': true, 'invoices.create': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/remitero'), member('remitero', {
+        'sales.view': true, 'clients.view': true, 'remitos.create': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/mirador'), member('mirador', { 'sales.view': true }));
+      await setDoc(doc(db, 'businesses/b1/members/deposito'), member('deposito', { 'stock.view': true }));
+      await setDoc(doc(db, 'businesses/b1/members/baja'), member('baja', {
+        'sales.view': true, 'invoices.cancel': true,
+      }, { active: false }));
+    });
+  });
+
+  test('quien anula sin stock.view lee el producto por id, pero no lista el catálogo', async () => {
+    await assertSucceeds(getDoc(doc(employee('anulador'), producto)));
+    await assertFails(getDocs(collection(employee('anulador'), catalogo)));
+  });
+
+  test('quien factura o hace remitos sin stock.view, igual', async () => {
+    for (const uid of ['vendedor', 'remitero']) {
+      await assertSucceeds(getDoc(doc(employee(uid), producto)));
+      await assertFails(getDocs(collection(employee(uid), catalogo)));
+    }
+  });
+
+  test('anular devuelve el stock en una transacción que lee el producto', async () => {
+    const db = employee('anulador');
+    const ref = doc(db, producto);
+    await assertSucceeds(runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      tx.update(ref, { quantity: snap.data().quantity + 1, updatedAt: serverTimestamp() });
+    }));
+  });
+
+  test('quien no mueve stock no lee ni por id', async () => {
+    await assertFails(getDoc(doc(employee('mirador'), producto)));
+    await assertFails(getDoc(doc(employee('baja'), producto)));
+    await assertFails(getDoc(doc(other('mallory'), producto)));
+  });
+
+  test('con stock.view se lee y se lista', async () => {
+    await assertSucceeds(getDoc(doc(employee('deposito'), producto)));
+    await assertSucceeds(getDocs(collection(employee('deposito'), catalogo)));
+    await assertSucceeds(getDocs(collection(owner('alice'), catalogo)));
+  });
+});
+
+// ============================================================
+describe('businesses/{id}/members — Stock Manager', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const member = (uid, over = {}) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions: {}, ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      await setDoc(doc(db, 'businesses/b1/members/maria'), member('maria'));
+      await setDoc(doc(db, 'businesses/b1/members/encargado'), member('encargado', {
+        permissions: { 'team.manage': true },
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/gerente'), member('gerente', { role: 'admin' }));
+      await setDoc(doc(db, 'businesses/b1/members/subgerente'), member('subgerente', { role: 'admin' }));
+      await setDoc(doc(db, 'businesses/b1/members/exadmin'), member('exadmin', { role: 'admin', active: false }));
+      await setDoc(doc(db, 'businesses/b1/members/asignador'), member('asignador', {
+        permissions: { 'stock.view': true, 'stockcount.perform': true, 'stockcount.manage': true },
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/contador'), member('contador', {
+        permissions: { 'stock.view': true, 'stockcount.perform': true },
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/exasignador'), member('exasignador', {
+        active: false,
+        permissions: { 'stock.view': true, 'stockcount.perform': true, 'stockcount.manage': true },
+      }));
+    });
+  });
+
+  test('team.manage no da el rol admin', async () => {
+    await assertFails(updateDoc(doc(employee('encargado'), 'businesses/b1/members/maria'), { role: 'admin' }));
+  });
+
+  test('team.manage no toca a quien ya es admin: ni lo baja, ni lo edita, ni lo reactiva', async () => {
+    const gerente = 'businesses/b1/members/gerente';
+    await assertFails(updateDoc(doc(employee('encargado'), gerente), { role: 'vendedor' }));
+    await assertFails(updateDoc(doc(employee('encargado'), gerente), { active: false }));
+    await assertFails(updateDoc(doc(employee('encargado'), gerente), { displayName: 'Otro' }));
+    await assertFails(updateDoc(doc(employee('encargado'), 'businesses/b1/members/exadmin'), { active: true }));
+  });
+
+  test('a un admin lo toca otro admin, el dueño o el super-admin', async () => {
+    const subgerente = 'businesses/b1/members/subgerente';
+    await assertSucceeds(updateDoc(doc(employee('gerente'), subgerente), { active: false }));
+    await assertSucceeds(updateDoc(doc(employee('gerente'), 'businesses/b1/members/exadmin'), { active: true }));
+    await assertSucceeds(updateDoc(doc(employee('gerente'), 'businesses/b1/members/maria'), { role: 'admin' }));
+    await assertSucceeds(updateDoc(doc(owner('alice'), subgerente), { role: 'vendedor' }));
+    await assertSucceeds(updateDoc(doc(owner('alice'), 'businesses/b1/members/encargado'), { role: 'admin' }));
+    await assertSucceeds(updateDoc(doc(admin(), 'businesses/b1/members/contador'), { role: 'admin' }));
+  });
+
+  test('un admin desactivado no toca a nadie', async () => {
+    await assertFails(updateDoc(doc(employee('exadmin'), 'businesses/b1/members/maria'), { role: 'admin' }));
+    await assertFails(updateDoc(doc(employee('exadmin'), 'businesses/b1/members/subgerente'), { active: false }));
+  });
+
+  test('nadie se edita a sí mismo, ni siendo admin', async () => {
+    await assertFails(updateDoc(doc(employee('gerente'), 'businesses/b1/members/gerente'), { displayName: 'Yo' }));
+    await assertFails(updateDoc(doc(employee('encargado'), 'businesses/b1/members/encargado'), { role: 'admin' }));
+  });
+
+  test('un doc viejo sin role se sigue pudiendo editar con team.manage', async () => {
+    const viejo = member('pedro');
+    delete viejo.role;
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/members/pedro'), viejo));
+    await assertSucceeds(updateDoc(doc(employee('encargado'), 'businesses/b1/members/pedro'), { role: 'vendedor' }));
+  });
+
+  test('quien asigna controles ve el equipo; quien solo cuenta, no', async () => {
+    const equipo = 'businesses/b1/members';
+    await assertSucceeds(getDocs(collection(employee('asignador'), equipo)));
+    await assertSucceeds(getDoc(doc(employee('asignador'), `${equipo}/maria`)));
+    await assertFails(getDocs(collection(employee('contador'), equipo)));
+    await assertFails(getDoc(doc(employee('contador'), `${equipo}/maria`)));
+    await assertSucceeds(getDoc(doc(employee('contador'), `${equipo}/contador`)));
+  });
+
+  test('stockcount.manage desactivado no ve el equipo', async () => {
+    await assertFails(getDocs(collection(employee('exasignador'), 'businesses/b1/members')));
+    await assertFails(getDoc(doc(employee('exasignador'), 'businesses/b1/members/maria')));
+  });
+
+  test('ver el equipo para asignar controles no deja editarlo', async () => {
+    await assertFails(updateDoc(doc(employee('asignador'), 'businesses/b1/members/maria'), { role: 'vendedor' }));
+  });
+
+  test('el rol y los permisos se editan; el comercio del doc, no', async () => {
+    const maria = 'businesses/b1/members/maria';
+    await assertSucceeds(updateDoc(doc(employee('encargado'), maria), { role: 'vendedor' }));
+    await assertFails(updateDoc(doc(employee('encargado'), maria), { businessId: 'b2' }));
+    await assertSucceeds(updateDoc(doc(owner('alice'), maria), { role: 'deposito' }));
+    await assertFails(updateDoc(doc(owner('alice'), maria), { businessId: 'b2' }));
+  });
+
+  test('un doc viejo sin businessId se sigue pudiendo editar', async () => {
+    const viejo = member('pedro');
+    delete viejo.businessId;
+    await seed(async (db) => setDoc(doc(db, 'businesses/b1/members/pedro'), viejo));
+    await assertSucceeds(updateDoc(doc(owner('alice'), 'businesses/b1/members/pedro'), { role: 'vendedor' }));
   });
 });
 
