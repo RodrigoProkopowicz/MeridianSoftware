@@ -143,6 +143,7 @@ exports.listMyProducts                = promotional.listMyProducts;
 // ============================================================
 const stockMembers = require('./stock/members');
 exports.createBusinessMember      = stockMembers.createBusinessMember;
+exports.assignBusinessMember      = stockMembers.assignBusinessMember;
 exports.setBusinessMemberPassword = stockMembers.setBusinessMemberPassword;
 exports.deleteBusinessMember      = stockMembers.deleteBusinessMember;
 exports.syncStockMemberAccess     = stockMembers.syncStockMemberAccess;

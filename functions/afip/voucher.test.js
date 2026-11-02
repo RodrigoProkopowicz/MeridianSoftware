@@ -8,6 +8,8 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CAE_LOCK_MS,
+  isCaeLocked,
   COND_IVA_RECEPTOR,
   resolveCbteTipo,
   resolveReceptorDoc,
@@ -310,5 +312,22 @@ describe('toWsfeData', () => {
     assert.equal(data.Iva, undefined);
     assert.equal(data.CbteTipo, 11);
     assert.equal(data.ImpNeto, 500);
+  });
+});
+
+describe('isCaeLocked', () => {
+  const pedidoEn = (ms) => ({ caeRequestedAt: { toMillis: () => ms } });
+
+  test('sin pedido en curso no hay bloqueo', () => {
+    assert.equal(isCaeLocked({}, 1000), false);
+    assert.equal(isCaeLocked(null, 1000), false);
+  });
+
+  test('un pedido reciente bloquea', () => {
+    assert.equal(isCaeLocked(pedidoEn(1000), 1000 + CAE_LOCK_MS - 1), true);
+  });
+
+  test('uno que quedó colgado deja de bloquear', () => {
+    assert.equal(isCaeLocked(pedidoEn(1000), 1000 + CAE_LOCK_MS), false);
   });
 });

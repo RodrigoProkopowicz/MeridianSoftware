@@ -6,7 +6,9 @@
  *   1. La cuenta **dueña**: la crea un admin desde el panel de Meridian
  *      (`createUser`). Es la administradora de los comercios que da de alta.
  *   2. Las cuentas de **empleado**: las crea el dueño desde la pantalla Equipo,
- *      con permisos recortados. Viven en `businesses/{id}/members/{uid}`.
+ *      con permisos recortados. Viven en `businesses/{id}/members/{uid}`, un doc
+ *      por comercio: la misma persona puede trabajar en varios del mismo dueño,
+ *      con un rol y permisos distintos en cada uno.
  *
  * Dar de alta un usuario de Authentication exige el Admin SDK, así que pasa por
  * acá y no por el cliente: nadie se auto-registra. Los cambios de permisos, en
@@ -14,6 +16,7 @@
  *
  * Exports:
  *   - createBusinessMember       → crea la cuenta + el doc de miembro
+ *   - assignBusinessMember       → suma a un empleado a otro comercio del mismo dueño
  *   - setBusinessMemberPassword  → le pone una contraseña nueva a un empleado
  *   - deleteBusinessMember       → lo saca del comercio (y borra la cuenta si no le queda ninguno)
  *   - syncStockMemberAccess      → propaga el acceso al producto del dueño a su equipo
@@ -59,17 +62,21 @@ const PERMISSION_REQUIRES = {
   'invoices.cancel':  ['sales.view'],
   'remitos.create':   ['sales.view', 'clients.view'],
   'clients.manage':   ['clients.view'],
-  'accounts.view':    ['clients.view'],
+  'accounts.view':    ['clients.view', 'sales.view'],
   'receipts.create':  ['clients.view', 'accounts.view'],
   // La ganancia neta se calcula sobre los comprobantes: sin verlos no hay de
   // dónde sacarla. No viene con ningún rol salvo admin.
   'profits.view':     ['sales.view'],
+  'insights.view':    ['stock.view'],
 };
 
 const ROLES = ['admin', 'vendedor', 'deposito', 'consulta', 'custom'];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+
+/** Código gRPC con el que Firestore rechaza `create()` sobre un doc que ya existe. */
+const GRPC_ALREADY_EXISTS = 6;
 
 // ============================================================
 // Helpers
@@ -84,7 +91,11 @@ function requireAuth(req) {
  * Quien llama tiene que mandar en el comercio: ser su dueño, un empleado
  * activo con `team.manage`, o el super-admin de Meridian.
  *
- * @returns {Promise<{ businessId: string, ownerId: string, business: object }>}
+ * `isAdmin` dice si además lo administra (dueño, super-admin o rol admin), que
+ * es más que manejar el equipo: `team.manage` es un tilde, y el rol admin es lo
+ * que ningún tilde tiene que poder otorgar.
+ *
+ * @returns {Promise<{ businessId: string, ownerId: string, business: object, isAdmin: boolean }>}
  */
 async function assertCanManageTeam(req, businessId) {
   const auth = requireAuth(req);
@@ -97,8 +108,8 @@ async function assertCanManageTeam(req, businessId) {
   if (!snap.exists) throw new HttpsError('not-found', 'El comercio no existe.');
 
   const business = snap.data();
-  if (business.ownerId === auth.uid) return { businessId, ownerId: business.ownerId, business };
-  if (auth.token.admin === true) return { businessId, ownerId: business.ownerId, business };
+  if (business.ownerId === auth.uid) return { businessId, ownerId: business.ownerId, business, isAdmin: true };
+  if (auth.token.admin === true) return { businessId, ownerId: business.ownerId, business, isAdmin: true };
 
   const member = await db.doc(`businesses/${businessId}/members/${auth.uid}`).get();
   const data = member.exists ? member.data() : null;
@@ -109,7 +120,65 @@ async function assertCanManageTeam(req, businessId) {
     throw new HttpsError('permission-denied', 'No administrás el equipo de este comercio.');
   }
 
-  return { businessId, ownerId: business.ownerId, business };
+  return { businessId, ownerId: business.ownerId, business, isAdmin: data.role === 'admin' };
+}
+
+/**
+ * El rol admin lo da solo quien administra el comercio. Si alcanzara con
+ * `team.manage`, un encargado crearía una cuenta admin y entraría con ella a
+ * leer el registro, y lo que hiciera dejaría de registrarse. Las reglas lo
+ * frenan en el update de `members`, pero estas callables se las saltean.
+ */
+function assertCanGrantRole(role, isAdmin) {
+  if (role === 'admin' && !isAdmin) {
+    throw new HttpsError('permission-denied',
+      'El rol Administrador lo da solo quien administra el comercio.');
+  }
+}
+
+/**
+ * Lo que se le hace a la cuenta vale para todos sus comercios: quien llama tiene
+ * que administrar el equipo de cada uno, no solo el del comercio desde el que lo
+ * pide. Si no, un encargado de un local entra con esa cuenta a otro que no
+ * administra, y lo que haga queda firmado con el nombre de otra persona en el
+ * registro.
+ *
+ * Donde la persona tiene rol admin, quien llama tiene que ser admin también: con
+ * su contraseña, `team.manage` llegaría a lo que ese tilde no da. Por eso se
+ * recorren todas las membresías sin saltear ninguna: la cuenta puede ser común
+ * en el comercio desde el que se pide y admin en otro.
+ *
+ * Si la consulta falla, el error sube y no se cambia nada: sin saber en qué
+ * comercios está la persona, no hay forma de decir que se puede.
+ */
+async function assertManagesEveryBusinessOf(req, uid) {
+  const memberships = await getFirestore().collectionGroup('members').where('uid', '==', uid).get();
+
+  for (const membership of memberships.docs) {
+    // El proyecto es compartido: una subcolección `members` de otro producto no
+    // es un comercio (mismo recorte que en deleteBusinessMember).
+    const comercio = membership.ref.parent.parent;
+    if (!comercio || comercio.parent.id !== 'businesses') continue;
+
+    let access;
+    try {
+      access = await assertCanManageTeam(req, comercio.id);
+    } catch (err) {
+      // `deleteBusiness` no borra en cascada: un comercio que ya no existe deja
+      // docs de miembro huérfanos, y esos no le dan acceso a nadie.
+      if (err.code === 'not-found') continue;
+      if (err.code === 'permission-denied') {
+        throw new HttpsError('permission-denied',
+          'Esa persona también trabaja en otro comercio que no administrás: su contraseña la cambia quien administre todos.');
+      }
+      throw err;
+    }
+
+    if (membership.data().role === 'admin' && !access.isAdmin) {
+      throw new HttpsError('permission-denied',
+        'Esa persona tiene rol Administrador: su contraseña la cambia otro administrador de ese comercio.');
+    }
+  }
 }
 
 function normalizeEmail(value) {
@@ -199,19 +268,23 @@ async function mirrorProductAccess(db, ownerId, memberUid) {
  */
 exports.createBusinessMember = onCall({ enforceAppCheck: true }, async (req) => {
   const { businessId, email, password, displayName, role, permissions } = req.data || {};
-  const { ownerId } = await assertCanManageTeam(req, businessId);
+  const { ownerId, isAdmin } = await assertCanManageTeam(req, businessId);
 
   const cleanEmail = normalizeEmail(email);
   const cleanPassword = normalizePassword(password);
   const name = normalizeDisplayName(displayName);
   const cleanRole = normalizeRole(role);
+  assertCanGrantRole(cleanRole, isAdmin);
   const cleanPermissions = normalizePermissions(permissions, cleanRole);
 
   const auth = getAuth();
   const db = getFirestore();
 
-  // 1. Cuenta de Authentication. Si el email ya existe, cortamos: sumar una
-  //    cuenta ajena a un comercio se hace a mano y con intención, no por acá.
+  // 1. Cuenta de Authentication. Si el email ya existe, cortamos: acá una cuenta
+  //    nunca se adopta por su email, porque cualquiera podría sumarse la de otro.
+  //    A quien ya trabaja en otro comercio del mismo dueño lo suma
+  //    `assignBusinessMember`, que exige administrar los dos. El mensaje orienta
+  //    sin decir a quién pertenece la cuenta.
   let userRecord;
   try {
     userRecord = await auth.createUser({
@@ -222,7 +295,8 @@ exports.createBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
     });
   } catch (err) {
     if (err.code === 'auth/email-already-exists') {
-      throw new HttpsError('already-exists', 'Ya existe una cuenta con ese email.');
+      throw new HttpsError('already-exists',
+        'Ya existe una cuenta con ese email. Si esa persona trabaja en otro de tus comercios, sumala con "Sumar de otro comercio".');
     }
     console.error('createBusinessMember: auth create failed', err.message);
     throw new HttpsError('internal', `No pudimos crear la cuenta: ${err.message}`);
@@ -265,11 +339,110 @@ exports.createBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
 });
 
 // ============================================================
+// assignBusinessMember
+// ============================================================
+/**
+ * Suma a un empleado que ya existe a otro comercio del mismo dueño: la misma
+ * cuenta, con su propio rol y sus propios permisos en cada lugar.
+ *
+ * Exige administrar el equipo de los DOS comercios. Si alcanzara con el destino,
+ * un encargado podría traerse a alguien de un local que no administra y ganar
+ * sobre esa persona la baja y el cambio de contraseña. El rol admin, además, lo
+ * da solo quien administra el comercio destino.
+ *
+ * Solo entre comercios del mismo dueño: el acceso al producto es un único doc
+ * por cuenta y se hereda del dueño, así que dos dueños se lo pisarían.
+ *
+ * La entrada es un uid y no un email, para que no sirva de consulta de qué
+ * cuentas existen; el email y el nombre salen del doc de origen, nunca del
+ * cliente. No toca Authentication, `users` ni `demoAccess`: con el mismo dueño,
+ * la cuenta y su acceso ya están como tienen que estar.
+ *
+ * Input:  { businessId, sourceBusinessId, uid, role, permissions }
+ * Output: { uid, businessId }
+ */
+exports.assignBusinessMember = onCall({ enforceAppCheck: true }, async (req) => {
+  const { businessId, sourceBusinessId, uid, role, permissions } = req.data || {};
+  const { ownerId, isAdmin } = await assertCanManageTeam(req, businessId);
+  const source = await assertCanManageTeam(req, sourceBusinessId);
+
+  if (businessId === sourceBusinessId || source.ownerId !== ownerId) {
+    throw new HttpsError('permission-denied',
+      'Solo se puede sumar a alguien desde otro comercio del mismo dueño.');
+  }
+
+  if (typeof uid !== 'string' || !uid) {
+    throw new HttpsError('invalid-argument', 'Falta el empleado.');
+  }
+  if (uid === ownerId) {
+    throw new HttpsError('failed-precondition', 'El dueño ya administra todos sus comercios.');
+  }
+  if (uid === req.auth.uid) {
+    throw new HttpsError('failed-precondition', 'No podés sumarte a vos mismo a un comercio.');
+  }
+
+  const db = getFirestore();
+
+  const profile = await db.doc(`users/${uid}`).get();
+  const account = profile.exists ? profile.data() : null;
+  if (account?.accountType !== 'employee' || account.employerUid !== ownerId) {
+    throw new HttpsError('failed-precondition', 'Esa cuenta no es de un empleado de este dueño.');
+  }
+
+  const origin = await db.doc(`businesses/${sourceBusinessId}/members/${uid}`).get();
+  if (!origin.exists) {
+    throw new HttpsError('not-found', 'Esa persona no es parte del equipo de origen.');
+  }
+  const originData = origin.data();
+  if (originData.owner === true) {
+    throw new HttpsError('failed-precondition', 'El dueño ya administra todos sus comercios.');
+  }
+  if (originData.active === false) {
+    throw new HttpsError('failed-precondition',
+      'Esa persona está desactivada en el comercio de origen: reactivala antes de sumarla a otro.');
+  }
+
+  const cleanRole = normalizeRole(role);
+  assertCanGrantRole(cleanRole, isAdmin);
+  const cleanPermissions = normalizePermissions(permissions, cleanRole);
+
+  // `create()` y no `set()`: si la persona ya está en este comercio, pisar el doc
+  // le borraría en silencio el rol y los permisos que tiene acá.
+  try {
+    await db.doc(`businesses/${businessId}/members/${uid}`).create({
+      uid,
+      businessId,
+      email: originData.email || '',
+      displayName: originData.displayName || '',
+      role: cleanRole,
+      permissions: cleanPermissions,
+      active: true,
+      owner: false,
+      createdBy: req.auth.uid,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    if (err.code === GRPC_ALREADY_EXISTS) {
+      throw new HttpsError('already-exists',
+        'Esa persona ya es parte de este comercio. Si está desactivada, reactivala desde Equipo.');
+    }
+    throw err;
+  }
+
+  return { uid, businessId };
+});
+
+// ============================================================
 // setBusinessMemberPassword
 // ============================================================
 /**
  * Cambia la contraseña de un empleado. Existe porque en un comercio la
  * contraseña se pierde y no siempre hay un mail a mano para el reseteo.
+ *
+ * La contraseña es de toda la cuenta, no de este comercio: por eso solo se toca
+ * en cuentas de empleado y exige administrar todos los comercios de la persona,
+ * y ser admin en los que ella tiene ese rol.
  *
  * Input:  { businessId, uid, password }
  * Output: { uid, updated: true }
@@ -290,6 +463,14 @@ exports.setBusinessMemberPassword = onCall({ enforceAppCheck: true }, async (req
   const member = await db.doc(`businesses/${businessId}/members/${uid}`).get();
   if (!member.exists) throw new HttpsError('not-found', 'Esa persona no es parte del equipo.');
 
+  // Sin perfil no podemos saber qué es esta cuenta: ante la duda, no se toca.
+  const profile = await db.doc(`users/${uid}`).get();
+  if (!profile.exists || profile.data().accountType !== 'employee') {
+    throw new HttpsError('failed-precondition', 'Solo se puede cambiar la contraseña de una cuenta de empleado.');
+  }
+
+  await assertManagesEveryBusinessOf(req, uid);
+
   await getAuth().updateUser(uid, { password: normalizePassword(password) });
   return { uid, updated: true };
 });
@@ -303,11 +484,17 @@ exports.setBusinessMemberPassword = onCall({ enforceAppCheck: true }, async (req
  * para nada y quedaría dando vueltas con acceso al login.
  *
  * Input:  { businessId, uid }
- * Output: { uid, deleted: boolean }  (`deleted` = si se borró también la cuenta)
+ * Output: { uid, deleted: boolean, reason?: string, activeElsewhere?: boolean }
+ *
+ * `deleted` dice si se borró también la cuenta. Cuando no, `reason` dice por qué,
+ * para que el cliente no afirme lo que no pasó:
+ *   - 'other-businesses' → sigue en otro comercio
+ *   - 'unverified'       → no pudimos confirmar si le queda alguno
+ *   - 'not-employee'     → no es una cuenta de empleado
  */
 exports.deleteBusinessMember = onCall({ enforceAppCheck: true }, async (req) => {
   const { businessId, uid } = req.data || {};
-  const { ownerId } = await assertCanManageTeam(req, businessId);
+  const { ownerId, isAdmin } = await assertCanManageTeam(req, businessId);
 
   if (typeof uid !== 'string' || !uid) {
     throw new HttpsError('invalid-argument', 'Falta el empleado.');
@@ -323,6 +510,10 @@ exports.deleteBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
   const memberRef = db.doc(`businesses/${businessId}/members/${uid}`);
   const member = await memberRef.get();
   if (!member.exists) throw new HttpsError('not-found', 'Esa persona no es parte del equipo.');
+  // Igual que en las reglas de `members`: a un administrador lo toca solo otro.
+  if (member.data().role === 'admin' && !isAdmin) {
+    throw new HttpsError('permission-denied', 'A un administrador lo saca solo otro administrador.');
+  }
 
   // ¿Le queda algún OTRO comercio? Se pregunta ANTES de borrar: si la query
   // fallara con el doc ya borrado, la persona quedaría fuera del equipo pero
@@ -331,24 +522,34 @@ exports.deleteBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
   // tiene otros comercios: sacarle el acceso acá es lo urgente; borrar la
   // cuenta puede esperar y es lo irreversible.
   let quedanOtros = true;
+  let verificado = false;
+  let activeElsewhere;
   try {
     const otros = await db.collectionGroup('members').where('uid', '==', uid).get();
     // El proyecto Firebase es compartido con los otros productos: acotamos a
     // `businesses/*` para que una subcolección `members` de otro producto no
     // cuente como comercio y deje cuentas sin limpiar para siempre, en silencio.
-    quedanOtros = otros.docs.some(d => {
+    const membresias = otros.docs.filter(d => {
       const comercio = d.ref.parent.parent;
-      return comercio
-        && comercio.parent.id === 'businesses'
-        && comercio.id !== businessId;
+      return comercio && comercio.parent.id === 'businesses' && comercio.id !== businessId;
     });
+    // `deleteBusiness` no borra en cascada: un comercio que ya no existe deja
+    // docs de miembro huérfanos, y si contaran, la cuenta quedaría viva sin
+    // ningún equipo desde donde sacarla. Mismo criterio que
+    // assertManagesEveryBusinessOf. Si esta lectura falla, cae en el catch.
+    const comercios = await Promise.all(membresias.map(d => d.ref.parent.parent.get()));
+    const vigentes = membresias.filter((d, i) => comercios[i].exists);
+    quedanOtros = vigentes.length > 0;
+    activeElsewhere = vigentes.some(d => d.data().active !== false);
+    verificado = true;
   } catch (err) {
     console.error('deleteBusinessMember: no pudimos revisar otras membresías', err.message);
   }
 
-  await memberRef.delete();
-
-  if (quedanOtros) return { uid, deleted: false };
+  if (quedanOtros) {
+    await memberRef.delete();
+    return { uid, deleted: false, reason: verificado ? 'other-businesses' : 'unverified', activeElsewhere };
+  }
 
   // Cuenta de empleado sin comercios: se va del todo. Nunca tocamos cuentas
   // que no sean de empleado (las de Meridian las administra su propio panel).
@@ -358,13 +559,27 @@ exports.deleteBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
   // cuenta (las de Meridian las administra su propio panel), y borrar una de
   // Authentication no tiene vuelta atrás: ante la duda, se queda.
   if (!profile.exists || profile.data().accountType !== 'employee') {
-    return { uid, deleted: false };
+    // Sin perfil puede ser el final de una baja a medias, o una cuenta que el
+    // panel de Meridian ya borró: no se dice que la cuenta sigue si no sigue.
+    let accountGone = false;
+    if (!profile.exists) {
+      try {
+        await getAuth().getUser(uid);
+      } catch (err) {
+        if (err.code !== 'auth/user-not-found') {
+          throw new HttpsError('internal', `No pudimos revisar la cuenta: ${err.message}`);
+        }
+        accountGone = true;
+      }
+    }
+    await memberRef.delete();
+    return accountGone ? { uid, deleted: true } : { uid, deleted: false, reason: 'not-employee' };
   }
 
-  const demoDocs = await userRef.collection('demoAccess').get();
-  await Promise.all(demoDocs.docs.map(d => d.ref.delete()));
-  await userRef.delete();
-
+  // El doc de miembro va último: es lo que deja reintentar. Si algo falla antes,
+  // la persona sigue en el equipo y el segundo intento termina el trabajo; al
+  // revés, diría "no es parte del equipo" con la cuenta viva y sin forma de
+  // limpiarla, y el cliente no registraría una baja que sí pasó.
   try {
     await getAuth().deleteUser(uid);
   } catch (err) {
@@ -373,6 +588,11 @@ exports.deleteBusinessMember = onCall({ enforceAppCheck: true }, async (req) => 
       throw new HttpsError('internal', `No pudimos borrar la cuenta: ${err.message}`);
     }
   }
+
+  const demoDocs = await userRef.collection('demoAccess').get();
+  await Promise.all(demoDocs.docs.map(d => d.ref.delete()));
+  await userRef.delete();
+  await memberRef.delete();
 
   return { uid, deleted: true };
 });

@@ -182,7 +182,22 @@ function parseAfipDate(yyyymmdd) {
 function pad2(n) { return String(n).padStart(2, '0'); }
 function round2(n) { return Math.round(Number(n) * 100) / 100; }
 
+/**
+ * Cuánto se respeta un pedido de CAE en curso. Es algo más que el timeout de la
+ * function (120 s): si murió a mitad de camino, pasado ese tiempo se puede
+ * reintentar sin que nadie toque la factura a mano.
+ */
+const CAE_LOCK_MS = 130 * 1000;
+
+/** ¿Hay un pedido de CAE en curso para esta factura? */
+function isCaeLocked(invoice, nowMs) {
+  const requestedAt = invoice?.caeRequestedAt?.toMillis?.();
+  return typeof requestedAt === 'number' && nowMs - requestedAt < CAE_LOCK_MS;
+}
+
 module.exports = {
+  CAE_LOCK_MS,
+  isCaeLocked,
   COND_IVA_RECEPTOR,
   resolveCbteTipo,
   resolveReceptorDoc,
