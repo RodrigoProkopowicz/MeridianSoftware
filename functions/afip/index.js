@@ -22,7 +22,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { dummy, getLastAuthorized, requestCAE } = require('./wsfe');
 const { readSecret, writeSecret, assertBusinessAccess } = require('./store');
 const { CBTE_TIPO } = require('./config');
-const { buildVoucherRequest, formatVoucherNumber, parseAfipDate, isCaeLocked } = require('./voucher');
+const { buildVoucherRequest, formatVoucherNumber, parseAfipDate, caeRequestRefusal } = require('./voucher');
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
@@ -435,10 +435,8 @@ async function claimCaeRequest(invRef) {
     const snap = await tx.get(invRef);
     if (!snap.exists) throw new HttpsError('not-found', 'Factura no encontrada');
     const inv = snap.data();
-    if (inv.cae) throw new HttpsError('failed-precondition', 'La factura ya tiene CAE');
-    if (isCaeLocked(inv, Date.now())) {
-      throw new HttpsError('failed-precondition', 'Ya se está pidiendo el CAE de esta factura. Esperá un momento.');
-    }
+    const refusal = caeRequestRefusal(inv, Date.now());
+    if (refusal) throw new HttpsError('failed-precondition', refusal);
     tx.update(invRef, { caeRequestedAt: FieldValue.serverTimestamp() });
     return inv;
   });
