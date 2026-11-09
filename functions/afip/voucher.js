@@ -195,9 +195,24 @@ function isCaeLocked(invoice, nowMs) {
   return typeof requestedAt === 'number' && nowMs - requestedAt < CAE_LOCK_MS;
 }
 
+/**
+ * Por qué no se le pide CAE a esta factura, o `null` si se puede pedir.
+ *
+ * Una restaurada de un backup es la copia de una venta de otro momento: si su
+ * CAE no vino en el archivo (los backups viejos no lo guardaban), ARCA puede
+ * haberla autorizado ya, y pedirlo de nuevo autorizaría dos veces la misma venta.
+ */
+function caeRequestRefusal(invoice, nowMs) {
+  if (invoice.cae) return 'La factura ya tiene CAE';
+  if (invoice.imported) return 'Es una factura restaurada de un backup: no se le pide CAE.';
+  if (isCaeLocked(invoice, nowMs)) return 'Ya se está pidiendo el CAE de esta factura. Esperá un momento.';
+  return null;
+}
+
 module.exports = {
   CAE_LOCK_MS,
   isCaeLocked,
+  caeRequestRefusal,
   COND_IVA_RECEPTOR,
   resolveCbteTipo,
   resolveReceptorDoc,

@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const {
   CAE_LOCK_MS,
   isCaeLocked,
+  caeRequestRefusal,
   COND_IVA_RECEPTOR,
   resolveCbteTipo,
   resolveReceptorDoc,
@@ -329,5 +330,32 @@ describe('isCaeLocked', () => {
 
   test('uno que quedó colgado deja de bloquear', () => {
     assert.equal(isCaeLocked(pedidoEn(1000), 1000 + CAE_LOCK_MS), false);
+  });
+});
+
+describe('caeRequestRefusal', () => {
+  const pendiente = { type: 'B', status: 'pending_cae', cae: null };
+  const cae = '76123456789012';
+
+  test('una factura sin CAE ni pedido en curso se puede pedir', () => {
+    assert.equal(caeRequestRefusal(pendiente, 1000), null);
+  });
+
+  test('una que ya tiene CAE no', () => {
+    assert.match(caeRequestRefusal({ ...pendiente, cae }, 1000), /ya tiene CAE/);
+  });
+
+  test('una restaurada de un backup no, aunque no haya traído su CAE', () => {
+    assert.match(caeRequestRefusal({ ...pendiente, imported: true }, 1000), /restaurada de un backup/);
+  });
+
+  test('una restaurada que trajo su CAE dice que ya lo tiene', () => {
+    assert.match(caeRequestRefusal({ ...pendiente, imported: true, cae }, 1000), /ya tiene CAE/);
+  });
+
+  test('con un pedido en curso hay que esperar; si quedó colgado, se puede reintentar', () => {
+    const pedido = { ...pendiente, caeRequestedAt: { toMillis: () => 1000 } };
+    assert.match(caeRequestRefusal(pedido, 1000), /Esperá un momento/);
+    assert.equal(caeRequestRefusal(pedido, 1000 + CAE_LOCK_MS), null);
   });
 });
