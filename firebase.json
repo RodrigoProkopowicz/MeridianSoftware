@@ -17,7 +17,8 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        "**/service-account.json"
       ]
     }
   ],
