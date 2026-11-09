@@ -23,7 +23,7 @@ import {
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, getDocs, query, where, writeBatch, runTransaction,
-  Timestamp, serverTimestamp, setLogLevel,
+  Timestamp, serverTimestamp, deleteField, setLogLevel,
 } from 'firebase/firestore';
 
 setLogLevel('error'); // silenciar el ruido de "permission denied" esperado
@@ -774,6 +774,282 @@ describe('businesses/{id}/remitos — marcar como facturado', () => {
     await assertSucceeds(updateDoc(doc(employee('vendedor'), 'businesses/b1/remitos/r3'), {
       invoiceId: 'inv-1', updatedAt: serverTimestamp(),
     }));
+  });
+});
+
+// ============================================================
+describe('businesses/{id} — los comprobantes se anulan, no se editan', () => {
+  const employee = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+  const member = (uid, permissions) => ({
+    uid, businessId: 'b1', email: `${uid}@x.com`, displayName: uid,
+    role: 'custom', active: true, permissions,
+  });
+
+  // Lo que cada `update` exige que no cambie, además de la firma.
+  const fijos = {
+    invoices:    { number: '0001-00000001', numberInt: 1, total: 1000, subtotal: 1000 },
+    remitos:     { number: '0001-00000001', numberInt: 1, totalQuantity: 3, subtotal: 1000 },
+    receipts:    { number: '0001-00000001', numberInt: 1, clientId: 'cli-1', total: 1000 },
+    creditNotes: { number: '0001-00000001', numberInt: 1, sourceId: 'inv-9', total: 1000 },
+  };
+  const colecciones = Object.keys(fijos);
+
+  // Una venta de Pedro, vigente.
+  const dePedro = (col, over = {}) => ({
+    ...fijos[col], status: 'issued', userId: 'pedro', userName: 'Pedro', ...over,
+  });
+
+  // Lo que escribe el cliente al anular (`cancelInvoice`, `cancelReceipt`…).
+  const anulacion = (over = {}) => ({
+    status: 'cancelled',
+    cancelReason: 'Error de carga',
+    cancelledAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'businesses/b1'), { ownerId: 'alice', name: 'Tienda', currency: 'ARS' });
+      // Pedro vende; María anula, y no tiene otro permiso.
+      await setDoc(doc(db, 'businesses/b1/members/pedro'), member('pedro', {
+        'sales.view': true, 'invoices.create': true, 'remitos.create': true, 'receipts.create': true,
+      }));
+      await setDoc(doc(db, 'businesses/b1/members/maria'), member('maria', {
+        'sales.view': true, 'accounts.view': true, 'invoices.cancel': true,
+      }));
+      for (const col of colecciones) {
+        await setDoc(doc(db, `businesses/b1/${col}/c1`), dePedro(col));
+      }
+    });
+  });
+
+  test('quien anula firma con su uid, empleado o dueño', async () => {
+    for (const col of colecciones) {
+      await seed((db) => setDoc(doc(db, `businesses/b1/${col}/c2`), dePedro(col)));
+      await assertSucceeds(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`),
+        anulacion({ cancelledBy: 'maria' })));
+      await assertSucceeds(updateDoc(doc(owner('alice'), `businesses/b1/${col}/c2`),
+        anulacion({ cancelledBy: 'alice' })));
+    }
+  });
+
+  test('el hosting viejo anula sin firmar', async () => {
+    for (const col of colecciones) {
+      await assertSucceeds(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`), anulacion()));
+    }
+  });
+
+  test('un comprobante de antes de userName se anula igual', async () => {
+    for (const col of colecciones) {
+      const viejo = dePedro(col);
+      delete viejo.userName;
+      await seed((db) => setDoc(doc(db, `businesses/b1/${col}/c2`), viejo));
+      await assertSucceeds(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c2`),
+        anulacion({ cancelledBy: 'maria' })));
+    }
+  });
+
+  test('nadie le pasa la venta a otro vendedor, ni el dueño', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c1`;
+      await assertFails(updateDoc(doc(employee('maria'), ref), { userId: 'maria', userName: 'María' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { userId: 'juan' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { userId: deleteField() }));
+      await assertFails(updateDoc(doc(owner('alice'), ref), { userId: 'alice' }));
+      // Tampoco de paso, en la misma escritura que la anula.
+      await assertFails(updateDoc(doc(employee('maria'), ref),
+        anulacion({ cancelledBy: 'maria', userId: 'maria' })));
+    }
+  });
+
+  test('el nombre que quedó escrito no se cambia, ni se agrega después', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c1`;
+      await assertFails(updateDoc(doc(employee('maria'), ref), { userName: 'Juan' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { userName: deleteField() }));
+
+      const viejo = dePedro(col);
+      delete viejo.userName;
+      await seed((db) => setDoc(doc(db, `businesses/b1/${col}/c2`), viejo));
+      await assertFails(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c2`), { userName: 'Juan' }));
+    }
+  });
+
+  test('no se anula en nombre de otro', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c1`;
+      await assertFails(updateDoc(doc(employee('maria'), ref), anulacion({ cancelledBy: 'pedro' })));
+      await assertFails(updateDoc(doc(employee('maria'), ref), anulacion({ cancelledBy: 'alice' })));
+    }
+  });
+
+  test('sin quien opere (signerId vacío), la anulación no se guarda', async () => {
+    for (const col of colecciones) {
+      await assertFails(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`),
+        anulacion({ cancelledBy: '' })));
+    }
+  });
+
+  test('la anulación se firma una sola vez', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c2`;
+      await seed((db) => setDoc(doc(db, ref), dePedro(col, {
+        status: 'cancelled', cancelReason: 'Error', cancelledBy: 'alice',
+      })));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelledBy: 'maria' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelledBy: deleteField() }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelledBy: '' }));
+      await assertFails(updateDoc(doc(owner('alice'), ref), { cancelledBy: 'pedro' }));
+      // Una escritura que no anula solo puede tocar updatedAt.
+      await assertSucceeds(updateDoc(doc(employee('maria'), ref), { updatedAt: serverTimestamp() }));
+    }
+  });
+
+  test('imported no se toca: lo traído de un backup no pasa a ser venta de nadie', async () => {
+    const ref = 'businesses/b1/invoices/c1';
+    await assertFails(updateDoc(doc(employee('maria'), ref), { imported: true }));
+
+    const importada = 'businesses/b1/invoices/imp';
+    await seed((db) => setDoc(doc(db, importada), dePedro('invoices', { imported: true })));
+    await assertFails(updateDoc(doc(employee('maria'), importada), { imported: false }));
+    await assertFails(updateDoc(doc(employee('maria'), importada), { imported: deleteField() }));
+    await assertSucceeds(updateDoc(doc(employee('maria'), importada), anulacion({ cancelledBy: 'maria' })));
+  });
+
+  test('liberar el remito al anular la factura es solo dejarlo sin factura', async () => {
+    const ref = 'businesses/b1/remitos/facturado';
+    await seed((db) => setDoc(doc(db, ref), dePedro('remitos', { invoiceId: 'inv-1' })));
+    await assertFails(updateDoc(doc(employee('maria'), ref), {
+      invoiceId: null, userId: 'maria', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(employee('maria'), ref), {
+      invoiceId: 'inv-2', updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(employee('maria'), ref), {
+      invoiceId: null, updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('anular la factura libera su remito en el mismo commit, con el registro', async () => {
+    const remito = 'businesses/b1/remitos/facturado';
+    await seed((db) => setDoc(doc(db, remito), dePedro('remitos', { invoiceId: 'c1' })));
+    const db = employee('maria');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'businesses/b1/invoices/c1'), anulacion({ cancelledBy: 'maria', stockReversed: false }));
+    batch.update(doc(db, remito), { invoiceId: null, updatedAt: serverTimestamp() });
+    batch.set(doc(db, 'businesses/b1/activity/a1'), {
+      action: 'invoice.cancel', actorId: 'maria', actorName: 'María', actorRole: 'custom',
+      targetId: 'c1', targetLabel: 'Factura 0001-00000001', detail: '', createdAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  test('anula devolviendo el stock: facturas y remitos', async () => {
+    for (const col of ['invoices', 'remitos']) {
+      await assertSucceeds(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`), anulacion({
+        cancelledBy: 'maria', stockReversed: true, reversalMovementIds: ['m1', 'm2'],
+      })));
+    }
+    // Un recibo o una devolución no devuelven stock al anularse.
+    for (const col of ['receipts', 'creditNotes']) {
+      await assertFails(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`), anulacion({
+        cancelledBy: 'maria', stockReversed: true,
+      })));
+    }
+  });
+
+  test('quien anula no reescribe lo que se emitió, ni el dueño', async () => {
+    const cambios = [
+      { issuedAt: Timestamp.fromMillis(Date.now() - 30 * DAY) },
+      { payment: { method: 'cash', paid: 0 } },
+      { lineItems: [] },
+      { clientId: 'otro-cliente' },
+      { notes: 'corregida' },
+      { number: '0001-00009999' },
+      { total: 1 },
+    ];
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c1`;
+      for (const cambio of cambios) {
+        await assertFails(updateDoc(doc(employee('maria'), ref), cambio));
+      }
+      await assertFails(updateDoc(doc(owner('alice'), ref), cambios[0]));
+      await assertFails(updateDoc(doc(owner('alice'), ref), cambios[1]));
+    }
+  });
+
+  test('tampoco de paso, en la misma escritura que lo anula', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c1`;
+      await assertFails(updateDoc(doc(employee('maria'), ref),
+        anulacion({ cancelledBy: 'maria', payment: { method: 'cash', paid: 0 } })));
+      await assertFails(updateDoc(doc(employee('maria'), ref),
+        anulacion({ cancelledBy: 'maria', issuedAt: Timestamp.fromMillis(Date.now() - 30 * DAY) })));
+    }
+  });
+
+  test('el CAE lo escribe solo ARCA, desde el servidor', async () => {
+    const cae = { cae: '74123456789012', caeExpiresAt: Timestamp.now(), afipStatus: 'authorized' };
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/invoices/c1'), cae));
+    await assertFails(updateDoc(doc(owner('alice'), 'businesses/b1/invoices/c1'), cae));
+  });
+
+  test('quien anula no pasa el comprobante a otro estado', async () => {
+    for (const col of colecciones) {
+      await assertFails(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`), {
+        status: 'pending_cae', updatedAt: serverTimestamp(),
+      }));
+    }
+  });
+
+  test('no se des-anula ni se reescribe la anulación', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c2`;
+      await seed((db) => setDoc(doc(db, ref), dePedro(col, {
+        status: 'cancelled', cancelReason: 'Error', cancelledBy: 'maria', cancelledAt: Timestamp.now(),
+      })));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { status: 'issued' }));
+      await assertFails(updateDoc(doc(owner('alice'), ref), { status: 'issued' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelReason: 'Otro motivo' }));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelledAt: serverTimestamp() }));
+      // Ni volver a anularlo encima, aunque firme la misma persona.
+      await assertFails(updateDoc(doc(employee('maria'), ref), anulacion({ cancelledBy: 'maria' })));
+    }
+    await assertFails(updateDoc(doc(employee('maria'), 'businesses/b1/invoices/c2'), { stockReversed: true }));
+  });
+
+  test('una anulación vieja sin firmar no se la adjudica nadie', async () => {
+    for (const col of colecciones) {
+      const ref = `businesses/b1/${col}/c2`;
+      await seed((db) => setDoc(doc(db, ref), dePedro(col, { status: 'cancelled', cancelReason: 'Error' })));
+      await assertFails(updateDoc(doc(employee('maria'), ref), { cancelledBy: 'maria' }));
+    }
+  });
+
+  test('la anulación queda con la hora del servidor', async () => {
+    for (const col of colecciones) {
+      await assertFails(updateDoc(doc(employee('maria'), `businesses/b1/${col}/c1`), anulacion({
+        cancelledBy: 'maria', cancelledAt: Timestamp.fromMillis(Date.now() - DAY),
+      })));
+    }
+  });
+
+  test('un comprobante no nace anulado en nombre de otro', async () => {
+    const emisor = { invoices: 'pedro', remitos: 'pedro', receipts: 'pedro', creditNotes: 'maria' };
+    for (const col of colecciones) {
+      const uid = emisor[col];
+      const nuevo = { ...fijos[col], status: 'issued', userId: uid, userName: uid };
+      await assertSucceeds(setDoc(doc(employee(uid), `businesses/b1/${col}/n1`), nuevo));
+      await assertFails(setDoc(doc(employee(uid), `businesses/b1/${col}/n2`), {
+        ...nuevo, status: 'cancelled', cancelledBy: 'alice',
+      }));
+    }
+  });
+
+  test('el super-admin conserva el acceso de soporte', async () => {
+    await assertSucceeds(updateDoc(doc(admin(), 'businesses/b1/invoices/c1'), { userId: 'juan' }));
   });
 });
 

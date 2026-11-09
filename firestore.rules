@@ -228,6 +228,40 @@ service cloud.firestore {
              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('accountType', 'owner') == 'employee';
     }
 
+    // ---- Comprobantes: lo emitido no se reescribe ----
+    // Facturas, remitos, recibos y devoluciones no se editan: quien tiene
+    // "Anular comprobantes" escribe la anulación y nada más. Lo demás queda como
+    // se emitió:
+    //   - número, cliente, renglones e importes;
+    //   - lo cobrado al emitir (`payment`, que mueve la cuenta corriente);
+    //   - la fecha, que define el período de las comisiones;
+    //   - el CAE, que lo escribe ARCA desde el servidor;
+    //   - la firma: `userId`, el nombre que quedó al lado (`userName`) e
+    //     `imported` (lo trajo un backup y no es venta de nadie) dicen de quién
+    //     es cada venta en "Ventas por vendedor".
+    //
+    // Se anula una sola vez, no se des-anula y queda con la hora del servidor.
+    // `cancelledBy` es el uid de quien anula; puede faltar porque el hosting
+    // viejo anula sin firmar. Una escritura que no anula solo toca `updatedAt`.
+    //
+    // `stockFields`: lo que esa anulación escribe además al devolver el stock.
+    function writesOnlyCancellation(stockFields) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let cancelFields = ['status', 'cancelReason', 'cancelledAt', 'cancelledBy'].concat(stockFields);
+      let cancelling = resource.data.get('status', null) != 'cancelled'
+                       && request.resource.data.get('status', null) == 'cancelled';
+      return changed.hasOnly(cancelFields.concat(['updatedAt']))
+             && (cancelling || !changed.hasAny(cancelFields))
+             && (!('cancelledAt' in changed) || request.resource.data.cancelledAt == request.time)
+             && (!('cancelledBy' in changed) || request.resource.data.cancelledBy == request.auth.uid);
+    }
+
+    // Al emitir, la firma es de quien escribe: cada `create` exige su `userId`,
+    // y el comprobante tampoco puede nacer anulado en nombre de otro.
+    function cancelledBySigner() {
+      return request.resource.data.get('cancelledBy', request.auth.uid) == request.auth.uid;
+    }
+
     match /businesses/{businessId} {
       // Lo ven su dueño y su equipo (el empleado necesita leer el comercio para
       // saber su nombre y su moneda).
@@ -418,41 +452,39 @@ service cloud.firestore {
       }
 
       // ---- invoices (comprobantes de venta) ----
-      // Las facturas son casi inmutables: solo se permite cambiar status /
-      // cancelReason (número y totales son inmutables). Emitir y anular son dos
-      // permisos distintos: un vendedor factura, pero anular puede quedar
-      // reservado. Admin tiene bypass total para soporte (incluido delete).
+      // Las facturas no se editan: solo se anulan (ver `writesOnlyCancellation`).
+      // Emitir y anular son dos permisos distintos: un vendedor factura, pero
+      // anular puede quedar reservado. Admin tiene bypass total para soporte
+      // (incluido delete).
       match /invoices/{invoiceId} {
         allow read:   if can(businessId, 'sales.view');
         allow create: if can(businessId, 'invoices.create')
                          && request.resource.data.userId == request.auth.uid
+                         && cancelledBySigner()
                          && request.resource.data.size() < 40;
         allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 40
-                           // Inmutables: número, totales, items, fecha de emisión
-                           && request.resource.data.number == resource.data.number
-                           && request.resource.data.numberInt == resource.data.numberInt
-                           && request.resource.data.total == resource.data.total
-                           && request.resource.data.subtotal == resource.data.subtotal)
+                           && writesOnlyCancellation(['stockReversed', 'reversalMovementIds']))
                         || isAdmin();
         allow delete: if isAdmin();
       }
 
       // ---- remitos (comprobantes de entrega de mercadería) ----
-      // Mismo criterio que invoices: casi inmutables (se permite anular, no
-      // reescribir número ni cantidades). Admin tiene bypass total.
+      // Mismo criterio que invoices: se anulan, no se editan. Admin tiene
+      // bypass total.
       match /remitos/{remitoId} {
         allow read:   if can(businessId, 'sales.view');
         allow create: if can(businessId, 'remitos.create')
                          && request.resource.data.userId == request.auth.uid
+                         && cancelledBySigner()
                          && request.resource.data.size() < 40;
         allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 40
-                           // Inmutables: número, cantidades y valorización
-                           && request.resource.data.number == resource.data.number
-                           && request.resource.data.numberInt == resource.data.numberInt
-                           && request.resource.data.totalQuantity == resource.data.totalQuantity
-                           && request.resource.data.subtotal == resource.data.subtotal)
+                           && (writesOnlyCancellation(['stockReversed', 'reversalMovementIds'])
+                               // Anular la factura libera los remitos que cubría.
+                               || (request.resource.data.diff(resource.data)
+                                     .affectedKeys().hasOnly(['invoiceId', 'updatedAt'])
+                                   && request.resource.data.get('invoiceId', null) == null)))
                         // Marcarlo como facturado va en la transacción de emitir
                         // la factura: si exigiera `invoices.cancel`, un vendedor
                         // sin ese permiso no podría facturar un remito.
@@ -465,21 +497,17 @@ service cloud.firestore {
       }
 
       // ---- receipts (recibos: cobros sobre la cuenta corriente) ----
-      // Mismo criterio que remitos: casi inmutables para el owner (se permite
-      // anular, no reescribir número ni importe — el saldo del cliente se
-      // calcula desde estos docs y no puede reescribirse la historia).
+      // Mismo criterio que remitos: se anulan, no se editan (el saldo del
+      // cliente se calcula desde estos docs y no puede reescribirse la historia).
       match /receipts/{receiptId} {
         allow read:   if can(businessId, 'accounts.view');
         allow create: if can(businessId, 'receipts.create')
                          && request.resource.data.userId == request.auth.uid
+                         && cancelledBySigner()
                          && request.resource.data.size() < 30;
         allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 30
-                           // Inmutables: número, cliente e importe
-                           && request.resource.data.number == resource.data.number
-                           && request.resource.data.numberInt == resource.data.numberInt
-                           && request.resource.data.clientId == resource.data.clientId
-                           && request.resource.data.total == resource.data.total)
+                           && writesOnlyCancellation([]))
                         || isAdmin();
         allow delete: if isAdmin();
       }
@@ -493,14 +521,13 @@ service cloud.firestore {
         allow read:   if can(businessId, 'sales.view');
         allow create: if can(businessId, 'invoices.cancel')
                          && request.resource.data.userId == request.auth.uid
+                         && cancelledBySigner()
                          && request.resource.data.sourceId is string
                          && request.resource.data.size() < 30;
-        // Solo se anula: número, origen e importe son inmutables.
+        // Solo se anula, como el resto de los comprobantes.
         allow update: if (can(businessId, 'invoices.cancel')
                            && request.resource.data.size() < 30
-                           && request.resource.data.number == resource.data.number
-                           && request.resource.data.sourceId == resource.data.sourceId
-                           && request.resource.data.total == resource.data.total)
+                           && writesOnlyCancellation([]))
                         || isAdmin();
         allow delete: if isAdmin();
       }
